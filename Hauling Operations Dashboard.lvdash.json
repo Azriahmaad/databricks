@@ -1,0 +1,169 @@
+{
+  "datasets": [
+    {
+      "name": "speed_trend",
+      "displayName": "Speed Trend",
+      "queryLines": [
+        "SELECT\n",
+        "  tanggal,\n",
+        "  kecepatan,\n",
+        "  jumlah_transaksi,\n",
+        "  -- Hitung Total Transaksi Harian\n",
+        "  SUM(jumlah_transaksi) OVER (PARTITION BY tanggal) AS total_harian,\n",
+        "  -- Hitung Persentase Harian\n",
+        "  (jumlah_transaksi * 100.0)\n",
+        "    / SUM(jumlah_transaksi) OVER (PARTITION BY tanggal) AS percentage_of_day\n",
+        "FROM\n",
+        "  workspace.gold.daily_speed_trend\n",
+        "WHERE\n",
+        "  tanggal BETWEEN\n",
+        "    (\n",
+        "      SELECT\n",
+        "        MIN(tanggal)\n",
+        "      FROM\n",
+        "        workspace.gold.daily_speed_trend\n",
+        "    )\n",
+        "  AND\n",
+        "    (\n",
+        "      SELECT\n",
+        "        MAX(tanggal)\n",
+        "      FROM\n",
+        "        workspace.gold.daily_speed_trend\n",
+        "    )\n",
+        "ORDER BY\n",
+        "  tanggal,\n",
+        "  percentage_of_day DESC"
+      ],
+      "catalog": "workspace",
+      "schema": "gold"
+    }
+  ],
+  "pages": [
+    {
+      "name": "4d76614d",
+      "displayName": "Page 1",
+      "layout": [
+        {
+          "widget": {
+            "name": "dda29a73",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "speed_trend",
+                  "fields": [
+                    {
+                      "name": "kecepatan",
+                      "expression": "`kecepatan`"
+                    },
+                    {
+                      "name": "tanggal",
+                      "expression": "`tanggal`"
+                    },
+                    {
+                      "name": "percentage_of_day",
+                      "expression": "`percentage_of_day`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "mark": {
+                "layout": "percent-stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "tanggal",
+                  "axis": {
+                    "hideLabels": false,
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "percentage_of_day",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "kecepatan",
+                  "legend": {
+                    "hide": false
+                  },
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "custom-order",
+                      "orderedValues": [
+                        "Lebih dari 10 Kpj",
+                        "Antara 7 Kpj sampai 10 Kpj",
+                        "Kurang dari 7 Kpj"
+                      ]
+                    },
+                    "mappings": [
+                      {
+                        "value": "Kurang dari 7 Kpj",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 2
+                        }
+                      },
+                      {
+                        "value": "Antara 7 Kpj sampai 10 Kpj",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 3
+                        }
+                      },
+                      {
+                        "value": "Lebih dari 10 Kpj",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 6
+                        }
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
