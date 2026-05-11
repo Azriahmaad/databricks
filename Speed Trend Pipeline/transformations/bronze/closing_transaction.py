@@ -6,8 +6,8 @@ def get_jdbc_config():
     """Get JDBC connection configuration with resilience settings"""
     jdbc_url = "jdbc:postgresql://aws-1-ap-southeast-1.pooler.supabase.com:5432/wim"
     props = {
-        "user": "postgres.duiatmmlmgnqvabxyjpt",
-        "password": "gRMltRBwm4b074yP",
+        "user": dbutils.secrets.get(scope="jdbc_supabase", key="username"),
+        "password": dbutils.secrets.get(scope="jdbc_supabase", key="password"),
         "driver": "org.postgresql.Driver",
         "fetchsize": "1000",
         "connectTimeout": "30",
@@ -80,7 +80,7 @@ Last Error Message: {error_msg}
 Connection Details:
 - Host: aws-1-ap-southeast-1.pooler.supabase.com:5432
 - Database: wim
-- User: postgres.duiatmmlmgnqvabxyjpt
+- User: (from secrets)
 
 Retry Configuration:
 - Max Retries: {max_retries}
@@ -105,67 +105,50 @@ Pipeline has been halted. Fix the connection issue and trigger a new update.
 # Step 1: Create target streaming table
 dp.create_streaming_table(
     name="bronze.closing_transaction",
-    comment="Bronze layer: Incremental ingestion from Supabase PostgreSQL with bidirectional ingestion and Phase 3 resilience (retry mechanism).",
+    comment="Bronze layer: Full load from Supabase PostgreSQL with Phase 3 resilience (retry mechanism). Incremental updates: use scheduled job.",
     table_properties={"quality": "bronze", "delta.enableChangeDataFeed": "true"}
 )
 
-# Step 2: Unified ingestion flow with retry mechanism - fetches from both directions in one run
-@dp.append_flow(target="bronze.closing_transaction", name="bidirectional_ingest", once=True, comment="Initial: fetch all data. Incremental: fetch forward + backfill (max 10k per run). Phase 3: 3x retry with 30s interval.")
+# Step 2: Full initial load - fetches ALL data from source (once=True means it only runs once in pipeline lifecycle)
+@dp.append_flow(target="bronze.closing_transaction", name="bidirectional_ingest", once=True, comment="Initial load: fetch ALL data from source (no limit). Incremental: fetch new data after max created_date. Phase 3: 3x retry with 30s interval.")
 def bidirectional_ingest():
     """
-    Unified ingestion with Phase 3 resilience:
-    - Initial load: Fetch ALL data from source (no limit)
-    - Subsequent runs: Forward (created_date > max) + Backfill (created_date < min), limit 10k total
+    Full initial load with Phase 3 resilience:
+    - Initial load: Fetch ALL data from source (no limit) since once=True means this only runs once
+    - Subsequent pipeline updates: Fetch data newer than max created_date (for incremental if pipeline is recreated)
     - Retry mechanism: 3x retry with 30s interval for connection failures
     - Alert: Pipeline halts if all retries exhausted
     """
     jdbc_url, props = get_jdbc_config()
     
-    # Get current watermarks
+    # Get current max watermark
     try:
-        wm_df = spark.read.table("bronze.closing_transaction").select(
-            F.max("created_date").alias("max_wm"),
-            F.min("created_date").alias("min_wm")
-        ).collect()[0]
-        max_wm = wm_df["max_wm"] or "1900-01-01 00:00:00"
-        min_wm = wm_df["min_wm"] or "9999-12-31 23:59:59"
+        max_wm = spark.read.table("bronze.closing_transaction").select(
+            F.max("created_date").alias("max_wm")
+        ).collect()[0]["max_wm"]
+        
+        if max_wm is None:
+            max_wm = "1900-01-01 00:00:00"
     except:
         # First run: Initial load
         max_wm = "1900-01-01 00:00:00"
-        min_wm = "9999-12-31 23:59:59"
     
-    # Strategy: Initial load fetches all, incremental fetches up to 10k
+    # Strategy: Fetch all data initially, or incremental if table already has data
     if max_wm == "1900-01-01 00:00:00":
-        # Initial load: Fetch ALL data from source (no LIMIT)
-        query = "(SELECT * FROM public.closing_transaction ORDER BY created_date DESC) AS initial"
-        print("[Bidirectional Ingest] Mode: INITIAL LOAD (fetching all data)")
+        # Initial load: Fetch ALL data (no LIMIT)
+        query = "(SELECT * FROM public.closing_transaction ORDER BY created_date ASC) AS initial"
+        print("[Full Load] Mode: INITIAL LOAD (fetching ALL data from source)")
     else:
-        # Incremental: Forward + Backfill with LIMIT 10k total
+        # Incremental: Fetch data newer than current max (only runs if pipeline is recreated/updated after initial load)
         query = f"""
-            (SELECT * FROM (
-                SELECT *, 1 as priority FROM public.closing_transaction 
-                WHERE created_date > '{max_wm}'
-                ORDER BY created_date ASC
-                LIMIT 10000
-            ) forward
-            UNION ALL
-            SELECT * FROM (
-                SELECT *, 2 as priority FROM public.closing_transaction 
-                WHERE created_date < '{min_wm}'
-                ORDER BY created_date DESC
-                LIMIT 10000
-            ) backfill
-            ORDER BY priority, created_date
-            LIMIT 10000) AS bidirectional
+            (SELECT * FROM public.closing_transaction 
+             WHERE created_date > '{max_wm}'
+             ORDER BY created_date ASC) AS incremental
         """
-        print(f"[Bidirectional Ingest] Mode: INCREMENTAL (forward from {max_wm}, backfill before {min_wm})")
+        print(f"[Full Load] Mode: INCREMENTAL (fetching data after {max_wm})")
     
     # Execute JDBC read with retry mechanism (Phase 3 resilience)
     df = jdbc_read_with_retry(jdbc_url, query, props, max_retries=3, retry_interval_seconds=30)
     
-    # Drop priority column if exists
-    if "priority" in df.columns:
-        df = df.drop("priority")
-    
-    print(f"[Bidirectional Ingest] Ingestion successful - returning DataFrame with metadata")
+    print(f"[Full Load] Ingestion successful - returning DataFrame with metadata")
     return add_metadata(df)
