@@ -675,6 +675,12 @@
                           "themeColorType": "visualizationColors",
                           "position": 3
                         }
+                      },
+                      {
+                        "value": "\u0000",
+                        "color": {
+                          "themeColorType": "widgetBorderColor"
+                        }
                       }
                     ]
                   }
