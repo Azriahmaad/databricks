@@ -1,0 +1,1161 @@
+{
+  "datasets": [
+    {
+      "name": "f0d98efd",
+      "displayName": "Speed Trend",
+      "queryLines": [
+        "SELECT\r\n",
+        "    tanggal,\r\n",
+        "    kecepatan,\r\n",
+        "    jumlah_transaksi,\r\n",
+        "    -- Hitung Total Transaksi Harian\r\n",
+        "    SUM(jumlah_transaksi) OVER (PARTITION BY tanggal) AS total_harian,\r\n",
+        "    -- Hitung Persentase Harian \r\n",
+        "    (jumlah_transaksi * 100.0) / SUM(jumlah_transaksi) OVER (PARTITION BY tanggal) AS percentage_of_day\r\n",
+        "FROM daily_speed_trend\r\n",
+        "WHERE tanggal BETWEEN \r\n",
+        "    (SELECT MIN(tanggal) FROM daily_speed_trend)\r\n",
+        "    AND\r\n",
+        "    (SELECT MAX(tanggal) FROM daily_speed_trend)\r\n",
+        "ORDER BY tanggal, percentage_of_day DESC\r\n",
+        "\r\n"
+      ],
+      "catalog": "poc",
+      "schema": "gold"
+    },
+    {
+      "name": "2c3f3673",
+      "displayName": "Company Comply",
+      "queryLines": [
+        "SELECT\r\n",
+        "    company_code,\r\n",
+        "    CASE\r\n",
+        "        -- Karena compliance_value adalah desimal (0.0 - 1.0), kita harus mengalikan 100\r\n",
+        "        WHEN compliance_value * 100.0 < 70 THEN 'Partially Comply (60%-70%)'\r\n",
+        "        WHEN compliance_value * 100.0 >= 70 AND compliance_value * 100.0 <= 80 THEN 'Nearly Comply (70%-80%)'\r\n",
+        "        WHEN compliance_value * 100.0 > 80 THEN 'Full Comply (> 80%)'\r\n",
+        "        ELSE 'Undefined'\r\n",
+        "    END AS compliance_category,\r\n",
+        "    \r\n",
+        "    -- Hitung frekuensi (Jumlah Hari) setiap perusahaan masuk ke kategori tersebut\r\n",
+        "    COUNT(report_date) AS frequency_count \r\n",
+        "FROM daily_company_comply\r\n",
+        "WHERE\r\n",
+        "    report_date BETWEEN '2025-10-29' AND '2025-11-05'\r\n",
+        "GROUP BY \r\n",
+        "    company_code,\r\n",
+        "    compliance_category\r\n",
+        "ORDER BY \r\n",
+        "    company_code, frequency_count DESC"
+      ],
+      "catalog": "poc",
+      "schema": "gold"
+    },
+    {
+      "name": "b6e01eb7",
+      "displayName": "7 - 10 Kpj Trend",
+      "queryLines": [
+        "WITH RankedData AS (\r\n",
+        "    -- 1. Hitung Total Transaksi Harian dan Persentase per Kategori\r\n",
+        "    SELECT\r\n",
+        "        tanggal,\r\n",
+        "        kecepatan,\r\n",
+        "        jumlah_transaksi,\r\n",
+        "        -- Hitung Total Transaksi untuk seluruh kategori pada tanggal yang sama\r\n",
+        "        SUM(jumlah_transaksi) OVER (PARTITION BY tanggal) AS total_harian,\r\n",
+        "        -- Hitung Persentase\r\n",
+        "        (jumlah_transaksi * 100.0) / SUM(jumlah_transaksi) OVER (PARTITION BY tanggal) AS percentage_of_day,\r\n",
+        "        -- Tentukan urutan tanggal untuk memudahkan pemilihan tanggal terbaru\r\n",
+        "        ROW_NUMBER() OVER (ORDER BY tanggal DESC) AS rn\r\n",
+        "    FROM\r\n",
+        "        daily_speed_trend -- Ganti dengan nama tabel Anda yang sebenarnya\r\n",
+        ")\r\n",
+        "SELECT\r\n",
+        "    tanggal,\r\n",
+        "    percentage_of_day AS persentase_7_10_kpj_terkini\r\n",
+        "FROM\r\n",
+        "    RankedData\r\n",
+        "WHERE\r\n",
+        "    -- Filter untuk mengambil kategori yang diinginkan\r\n",
+        "    kecepatan = 'Antara 7 Kpj sampai 10 Kpj'\r\n",
+        "    AND\r\n",
+        "    -- Filter untuk mengambil hanya tanggal terkini (rn=1)\r\n",
+        "    rn = 1;"
+      ],
+      "catalog": "poc",
+      "schema": "gold"
+    },
+    {
+      "name": "9c99400e",
+      "displayName": "Real Time Fleet Device Location Snapshot",
+      "queryLines": [
+        "-- Save as query: \"Fleet Live Position\"\r\n",
+        "WITH latest_positions AS (\r\n",
+        "  SELECT \r\n",
+        "    p.*,\r\n",
+        "    ROW_NUMBER() OVER (PARTITION BY p.deviceid ORDER BY p.servertime DESC) as rn\r\n",
+        "  FROM tc.default.tc_positions p\r\n",
+        ")\r\n",
+        "SELECT \r\n",
+        "  d.name as device_name,\r\n",
+        "  d.status,\r\n",
+        "  lp.latitude,\r\n",
+        "  lp.longitude,\r\n",
+        "  lp.speed,\r\n",
+        "  lp.servertime as last_update\r\n",
+        "FROM tc.default.tc_devices d\r\n",
+        "JOIN latest_positions lp ON d.id = lp.deviceid AND lp.rn = 1\r\n",
+        "WHERE lp.latitude IS NOT NULL"
+      ],
+      "catalog": "tc",
+      "schema": "default"
+    },
+    {
+      "name": "65dcbc53",
+      "displayName": "Top 5 lokasi KM terjelek",
+      "queryLines": [
+        "SELECT\r\n",
+        "  KM AS `Lokasi KM`,\r\n",
+        "  CAST(AVG(rerata_jarak_waktu) AS INT) AS `Rata-rata Jarak Waktu`\r\n",
+        "FROM\r\n",
+        "  tc.default.gold_v_famous_jarak_aman_km\r\n",
+        "WHERE\r\n",
+        "  week_of_year = '2025-W08'\r\n",
+        "GROUP BY\r\n",
+        "  KM\r\n",
+        "ORDER BY\r\n",
+        "  AVG(rerata_jarak_waktu) ASC\r\n",
+        "LIMIT 5"
+      ]
+    },
+    {
+      "name": "waktu_terbaik",
+      "displayName": "Top 5 waktu jarak aman terbaik",
+      "queryLines": [
+        "SELECT\n",
+        "  Interval AS `Range Waktu`,\n",
+        "  CAST(AVG(rerata_jarak_waktu) AS INT) AS `Rata-rata Jarak Waktu`\n",
+        "FROM\n",
+        "  tc.default.gold_v_famous_jarak_aman_gps\n",
+        "WHERE\n",
+        "  week_of_year = '2025-W08'\n",
+        "GROUP BY\n",
+        "  Interval\n",
+        "ORDER BY\n",
+        "  AVG(rerata_jarak_waktu) DESC\n",
+        "LIMIT 5"
+      ]
+    },
+    {
+      "name": "km_terbaik",
+      "displayName": "Top 5 lokasi KM terbaik",
+      "queryLines": [
+        "SELECT\n",
+        "  KM AS `Lokasi KM`,\n",
+        "  CAST(AVG(rerata_jarak_waktu) AS INT) AS `Rata-rata Jarak Waktu`\n",
+        "FROM\n",
+        "  tc.default.gold_v_famous_jarak_aman_km\n",
+        "WHERE\n",
+        "  week_of_year = '2025-W08'\n",
+        "GROUP BY\n",
+        "  KM\n",
+        "ORDER BY\n",
+        "  AVG(rerata_jarak_waktu) DESC\n",
+        "LIMIT 5"
+      ]
+    },
+    {
+      "name": "heatmap_waktu",
+      "displayName": "Famous jarak aman per waktu",
+      "queryLines": [
+        "SELECT\n",
+        "  Hari,\n",
+        "  Interval,\n",
+        "  AVG(rerata_jarak_waktu) AS `Jarak (s)`\n",
+        "FROM\n",
+        "  tc.default.gold_v_famous_jarak_aman_gps\n",
+        "WHERE\n",
+        "  week_of_year = '2025-W08'\n",
+        "GROUP BY\n",
+        "  Hari,\n",
+        "  Interval"
+      ]
+    },
+    {
+      "name": "heatmap_jarak_meter",
+      "displayName": "Famous jarak aman (meter)",
+      "queryLines": [
+        "SELECT\n",
+        "  Hari,\n",
+        "  Interval,\n",
+        "  AVG(rerata_jarak) AS `Jarak (m)`\n",
+        "FROM\n",
+        "  tc.default.gold_v_famous_jarak_aman_gps\n",
+        "WHERE\n",
+        "  week_of_year = '2025-W08'\n",
+        "GROUP BY\n",
+        "  Hari,\n",
+        "  Interval"
+      ]
+    },
+    {
+      "name": "heatmap_km",
+      "displayName": "Famous jarak aman per KM",
+      "queryLines": [
+        "SELECT\n",
+        "  Hari,\n",
+        "  KM,\n",
+        "  AVG(rerata_jarak_waktu) AS `Jarak (s)`\n",
+        "FROM\n",
+        "  tc.default.gold_v_famous_jarak_aman_km\n",
+        "WHERE\n",
+        "  week_of_year = '2025-W08'\n",
+        "GROUP BY\n",
+        "  Hari,\n",
+        "  KM"
+      ]
+    },
+    {
+      "name": "waktu_terjelek",
+      "displayName": "Top 5 waktu jarak aman terjelek",
+      "queryLines": [
+        "SELECT\n",
+        "  Interval AS `Range Waktu`,\n",
+        "  CAST(AVG(rerata_jarak_waktu) AS INT) AS `Rata-rata Jarak Waktu`\n",
+        "FROM\n",
+        "  tc.default.gold_v_famous_jarak_aman_gps\n",
+        "WHERE\n",
+        "  week_of_year = '2025-W08'\n",
+        "GROUP BY\n",
+        "  Interval\n",
+        "ORDER BY\n",
+        "  AVG(rerata_jarak_waktu) ASC\n",
+        "LIMIT 5"
+      ]
+    },
+    {
+      "name": "heatmap_grup_truk",
+      "displayName": "Famous jarak aman per grup truk",
+      "queryLines": [
+        "SELECT\n",
+        "  Hari,\n",
+        "  grup_truk_name AS `Group Truk`,\n",
+        "  AVG(rerata_jarak_waktu) AS `Jarak (s)`\n",
+        "FROM\n",
+        "  tc.default.gold_v_famous_jarak_aman_grup_truk\n",
+        "WHERE\n",
+        "  week_of_year = '2025-W08'\n",
+        "GROUP BY\n",
+        "  Hari,\n",
+        "  grup_truk_name"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "b75b74ce",
+      "displayName": "Speed trend & Company comply",
+      "layout": [
+        {
+          "widget": {
+            "name": "c649ca62",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "2c3f3673",
+                  "fields": [
+                    {
+                      "name": "compliance_category",
+                      "expression": "`compliance_category`"
+                    },
+                    {
+                      "name": "frequency_count",
+                      "expression": "`frequency_count`"
+                    },
+                    {
+                      "name": "company_code",
+                      "expression": "`company_code`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "frequency_count",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "company_code",
+                  "axis": {
+                    "title": "Company"
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "compliance_category",
+                  "legend": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "natural-order"
+                    },
+                    "mappings": [
+                      {
+                        "value": "Full Comply (> 80%)",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 2
+                        }
+                      },
+                      {
+                        "value": "Nearly Comply (70%-80%)",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 3
+                        }
+                      },
+                      {
+                        "value": "Partially Comply (60%-70%)",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 6
+                        }
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "ffa0feb8",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b6e01eb7",
+                  "fields": [
+                    {
+                      "name": "tanggal",
+                      "expression": "`tanggal`"
+                    },
+                    {
+                      "name": "persentase_7_10_kpj_terkini",
+                      "expression": "`persentase_7_10_kpj_terkini`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "persentase_7_10_kpj_terkini"
+                },
+                "target": {
+                  "fieldName": "tanggal"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "7 - 10 Kpj Currently"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "21d1efc8",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "f0d98efd",
+                  "fields": [
+                    {
+                      "name": "kecepatan",
+                      "expression": "`kecepatan`"
+                    },
+                    {
+                      "name": "tanggal",
+                      "expression": "`tanggal`"
+                    },
+                    {
+                      "name": "percentage_of_day",
+                      "expression": "`percentage_of_day`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "mark": {
+                "layout": "percent-stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "tanggal",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "percentage_of_day",
+                  "axis": {
+                    "hideTitle": true,
+                    "hideLabels": false,
+                    "hideGrid": false
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "kecepatan",
+                  "legend": {
+                    "hideTitle": false
+                  },
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "custom-order",
+                      "orderedValues": [
+                        "Lebih dari 10 Kpj",
+                        "Antara 7 Kpj sampai 10 Kpj",
+                        "Kurang dari 7 Kpj"
+                      ]
+                    },
+                    "mappings": [
+                      {
+                        "value": "Antara 7 Kpj sampai 10 Kpj",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 3
+                        }
+                      },
+                      {
+                        "value": "Kurang dari 7 Kpj",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 2
+                        }
+                      },
+                      {
+                        "value": "Lebih dari 10 Kpj",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 6
+                        }
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "b84c6a6f",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "b001f211",
+            "queries": [
+              {
+                "name": "dashboards/01f0bf5e7f211981985c5be952edd845/datasets/01f0bf5e8a4c1bb1ac16f45e0b9566c2_compliance_category",
+                "query": {
+                  "datasetName": "2c3f3673",
+                  "fields": [
+                    {
+                      "name": "compliance_category",
+                      "expression": "`compliance_category`"
+                    },
+                    {
+                      "name": "compliance_category_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "compliance_category",
+                    "queryName": "dashboards/01f0bf5e7f211981985c5be952edd845/datasets/01f0bf5e8a4c1bb1ac16f45e0b9566c2_compliance_category"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "245f5ae2",
+            "queries": [
+              {
+                "name": "dashboards/01f0bf5e7f211981985c5be952edd845/datasets/01f0bf5e87c41b50978bf7ace166dd5f_tanggal",
+                "query": {
+                  "datasetName": "f0d98efd",
+                  "fields": [
+                    {
+                      "name": "tanggal",
+                      "expression": "`tanggal`"
+                    },
+                    {
+                      "name": "tanggal_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "tanggal",
+                    "queryName": "dashboards/01f0bf5e7f211981985c5be952edd845/datasets/01f0bf5e87c41b50978bf7ace166dd5f_tanggal"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 1,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "71473a47",
+      "displayName": "traccar",
+      "layout": [
+        {
+          "widget": {
+            "name": "54107cf4",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "9c99400e",
+                  "fields": [
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "latitude",
+                      "expression": "`latitude`"
+                    },
+                    {
+                      "name": "longitude",
+                      "expression": "`longitude`"
+                    },
+                    {
+                      "name": "device_name",
+                      "expression": "`device_name`"
+                    },
+                    {
+                      "name": "speed",
+                      "expression": "`speed`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Bar",
+                "showTitle": true
+              },
+              "widgetType": "symbol-map",
+              "encodings": {
+                "coordinates": {
+                  "latitude": {
+                    "fieldName": "latitude"
+                  },
+                  "longitude": {
+                    "fieldName": "longitude"
+                  }
+                },
+                "color": {
+                  "fieldName": "status",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "offline",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      },
+                      {
+                        "value": "online",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 3
+                        }
+                      }
+                    ]
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "device_name",
+                    "displayName": "Device"
+                  },
+                  {
+                    "fieldName": "speed",
+                    "displayName": "Speed"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 0,
+            "width": 10,
+            "height": 8
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "7a36f1d4",
+      "displayName": "Famous",
+      "layout": [
+        {
+          "widget": {
+            "name": "table_km_terjelek",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "65dcbc53",
+                  "fields": [
+                    {
+                      "name": "Lokasi KM",
+                      "expression": "`Lokasi KM`"
+                    },
+                    {
+                      "name": "Rata-rata Jarak Waktu",
+                      "expression": "`Rata-rata Jarak Waktu`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Top 5 lokasi jarak aman paling jelek (kecil)",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "Lokasi KM"
+                  },
+                  {
+                    "fieldName": "Rata-rata Jarak Waktu"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "table_km_terbaik",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "km_terbaik",
+                  "fields": [
+                    {
+                      "name": "Lokasi KM",
+                      "expression": "`Lokasi KM`"
+                    },
+                    {
+                      "name": "Rata-rata Jarak Waktu",
+                      "expression": "`Rata-rata Jarak Waktu`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Top 5 lokasi jarak aman paling baik (besar)",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "Lokasi KM"
+                  },
+                  {
+                    "fieldName": "Rata-rata Jarak Waktu"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "table_waktu_terjelek",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "waktu_terjelek",
+                  "fields": [
+                    {
+                      "name": "Range Waktu",
+                      "expression": "`Range Waktu`"
+                    },
+                    {
+                      "name": "Rata-rata Jarak Waktu",
+                      "expression": "`Rata-rata Jarak Waktu`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Top 5 waktu jarak aman paling jelek",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "Range Waktu"
+                  },
+                  {
+                    "fieldName": "Rata-rata Jarak Waktu"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "table_waktu_terbaik",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "waktu_terbaik",
+                  "fields": [
+                    {
+                      "name": "Range Waktu",
+                      "expression": "`Range Waktu`"
+                    },
+                    {
+                      "name": "max(Rata-rata Jarak Waktu)",
+                      "expression": "MAX(`Rata-rata Jarak Waktu`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Top 5 waktu jarak aman paling baik",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "Range Waktu"
+                  },
+                  {
+                    "fieldName": "max(Rata-rata Jarak Waktu)"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "heatmap_waktu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "heatmap_waktu",
+                  "fields": [
+                    {
+                      "name": "Jarak (s)",
+                      "expression": "`Jarak (s)`"
+                    },
+                    {
+                      "name": "Hari",
+                      "expression": "`Hari`"
+                    },
+                    {
+                      "name": "Interval",
+                      "expression": "`Interval`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Waktu (s)",
+                "showTitle": true
+              },
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "Hari",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "Interval",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "Jarak (s)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "heatmap_grup_truk",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "heatmap_grup_truk",
+                  "fields": [
+                    {
+                      "name": "Jarak (s)",
+                      "expression": "`Jarak (s)`"
+                    },
+                    {
+                      "name": "Hari",
+                      "expression": "`Hari`"
+                    },
+                    {
+                      "name": "Group Truk",
+                      "expression": "`Group Truk`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Grup Truk (s)",
+                "showTitle": true
+              },
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "Hari",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "Group Truk",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "Jarak (s)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 4,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "heatmap_meter",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "heatmap_jarak_meter",
+                  "fields": [
+                    {
+                      "name": "Jarak (m)",
+                      "expression": "`Jarak (m)`"
+                    },
+                    {
+                      "name": "Hari",
+                      "expression": "`Hari`"
+                    },
+                    {
+                      "name": "Interval",
+                      "expression": "`Interval`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Jarak (m)",
+                "showTitle": true
+              },
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "Hari",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "Interval",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "Jarak (m)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 4,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "heatmap_km",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "heatmap_km",
+                  "fields": [
+                    {
+                      "name": "Jarak (s)",
+                      "expression": "`Jarak (s)`"
+                    },
+                    {
+                      "name": "Hari",
+                      "expression": "`Hari`"
+                    },
+                    {
+                      "name": "KM",
+                      "expression": "`KM`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Geofence KM (s)",
+                "showTitle": true
+              },
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "Hari",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "KM",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "Jarak (s)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 4,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
