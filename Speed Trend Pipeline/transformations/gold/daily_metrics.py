@@ -4,7 +4,7 @@ from pyspark.sql import functions as F
 # Gold Layer: Daily speed trend for dashboard visualization
 
 @dp.materialized_view(
-    name="workspace.gold.daily_speed_trend",
+    name="gold.daily_speed_trend",
     comment="Gold: Daily speed trend aggregation for dashboard - filters ACTUAL transactions only",
     table_properties={
         "pipelines.autoOptimize.managed": "true",
@@ -16,7 +16,7 @@ def daily_speed_trend():
     Daily speed trend aggregation for dashboard visualization.
     Aggregates by date and speed category, filtering only ACTUAL transactions.
     """
-    df = spark.read.table("workspace.silver.closing_transaction_enriched")
+    df = spark.read.table("silver.closing_transaction_enriched")
     
     result = (
         df

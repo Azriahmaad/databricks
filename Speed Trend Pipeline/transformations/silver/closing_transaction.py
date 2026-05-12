@@ -3,7 +3,7 @@ from pyspark.sql import functions as F
 
 # Silver layer: Streaming table with speed enrichment for incremental processing
 @dp.table(
-    name="workspace.silver.closing_transaction_enriched",
+    name="silver.closing_transaction_enriched",
     comment="Silver layer: Enriched closing transactions with speed categories and time dimensions",
     table_properties={
         "pipelines.autoOptimize.managed": "true",
@@ -22,7 +22,7 @@ def closing_transaction_enriched():
     - Time dimensions
     - Data quality checks
     """
-    df = spark.readStream.table("workspace.bronze.closing_transaction")
+    df = spark.readStream.table("bronze.closing_transaction")
     
     # Enrich with speed categories and compliance flags
     df_enriched = (
