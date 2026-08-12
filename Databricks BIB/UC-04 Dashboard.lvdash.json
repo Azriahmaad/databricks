@@ -1,0 +1,444 @@
+{
+  "datasets": [
+    {
+      "name": "stockpile_gold",
+      "displayName": "Stockpile Gold",
+      "queryLines": [
+        "SELECT\n",
+        "  op_date,\n",
+        "  shift,\n",
+        "  hour,\n",
+        "  jumlah_inbound,\n",
+        "  jumlah_outbound,\n",
+        "  jumlah_aktif_geofence,\n",
+        "  jumlah_tonase\n",
+        "FROM\n",
+        "  uc.urise.stockpile_gold\n",
+        "ORDER BY\n",
+        "  op_date,\n",
+        "  shift,\n",
+        "  hour"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "1206b04d",
+      "displayName": "North Stockpile",
+      "layout": [
+        {
+          "widget": {
+            "name": "bar_tonase",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "shift",
+                      "expression": "`shift`"
+                    },
+                    {
+                      "name": "op_date",
+                      "expression": "`op_date`"
+                    },
+                    {
+                      "name": "sum(jumlah_tonase)",
+                      "expression": "SUM(`jumlah_tonase`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Jumlah Tonase per Op Date + Shift + Hour",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "op_date",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(jumlah_tonase)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "shift",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 8,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "counter_aktif",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "sum(jumlah_aktif_geofence)",
+                      "expression": "SUM(`jumlah_aktif_geofence`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Unit Aktif dalam Geofence",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(jumlah_aktif_geofence)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "counter_inbound",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "sum(jumlah_inbound)",
+                      "expression": "SUM(`jumlah_inbound`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Jumlah Inbound",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(jumlah_inbound)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "counter_outbound",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "sum(jumlah_outbound)",
+                      "expression": "SUM(`jumlah_outbound`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Jumlah Outbound",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(jumlah_outbound)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 10,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "9df4de9d",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "jumlah_inbound",
+                      "expression": "SUM(`jumlah_inbound`)"
+                    },
+                    {
+                      "name": "jumlah_outbound",
+                      "expression": "SUM(`jumlah_outbound`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "jsonSpec": {
+                "type": "vega-lite",
+                "spec": "{\"$schema\":\"https://vega.github.io/schema/vega-lite/v5.json\",\"data\":{\"name\":\"databricks_query\"},\"transform\":[{\"fold\":[\"jumlah_inbound\",\"jumlah_outbound\"],\"as\":[\"metric_key\",\"metric_value\"]},{\"calculate\":\"datum.metric_key == 'jumlah_inbound' ? 'Jumlah Inbound' : 'Jumlah Outbound'\",\"as\":\"metric_label\"},{\"calculate\":\"format(datum.metric_value, ',.0f')\",\"as\":\"formatted_value\"}],\"vconcat\":[{\"width\":200,\"height\":100,\"layer\":[{\"mark\":{\"type\":\"text\",\"fontSize\":13,\"dy\":-20},\"encoding\":{\"text\":{\"field\":\"metric_label\",\"type\":\"nominal\"}}},{\"mark\":{\"type\":\"text\",\"fontSize\":32,\"fontWeight\":\"bold\",\"dy\":15},\"encoding\":{\"text\":{\"field\":\"formatted_value\",\"type\":\"nominal\"}}}],\"transform\":[{\"filter\":\"datum.metric_key == 'jumlah_inbound'\"}]},{\"width\":200,\"height\":100,\"layer\":[{\"mark\":{\"type\":\"text\",\"fontSize\":13,\"dy\":-20},\"encoding\":{\"text\":{\"field\":\"metric_label\",\"type\":\"nominal\"}}},{\"mark\":{\"type\":\"text\",\"fontSize\":32,\"fontWeight\":\"bold\",\"dy\":15},\"encoding\":{\"text\":{\"field\":\"formatted_value\",\"type\":\"nominal\"}}}],\"transform\":[{\"filter\":\"datum.metric_key == 'jumlah_outbound'\"}]}]}"
+              },
+              "frame": {
+                "title": "Inbound vs Outbound",
+                "showTitle": true
+              },
+              "widgetType": "custom-vega-viz",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "jumlah_inbound"
+                  },
+                  {
+                    "fieldName": "jumlah_outbound"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 5,
+            "width": 4,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_date",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2a8cc01eb983b5c49708ddaa85/datasets/01f18e6809c91ffc8bd6bed019fce835_op_date",
+                "query": {
+                  "datasetName": "stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "op_date",
+                      "expression": "`op_date`"
+                    },
+                    {
+                      "name": "op_date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Filter Tanggal",
+                "showTitle": true
+              },
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "op_date",
+                    "queryName": "dashboards/01f18e2a8cc01eb983b5c49708ddaa85/datasets/01f18e6809c91ffc8bd6bed019fce835_op_date"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_shift",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2a8cc01eb983b5c49708ddaa85/datasets/01f18e6809c91ffc8bd6bed019fce835_shift",
+                "query": {
+                  "datasetName": "stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "shift",
+                      "expression": "`shift`"
+                    },
+                    {
+                      "name": "shift_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Filter Shift",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "shift",
+                    "queryName": "dashboards/01f18e2a8cc01eb983b5c49708ddaa85/datasets/01f18e6809c91ffc8bd6bed019fce835_shift"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_hour",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2a8cc01eb983b5c49708ddaa85/datasets/01f18e6809c91ffc8bd6bed019fce835_hour",
+                "query": {
+                  "datasetName": "stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "hour",
+                      "expression": "`hour`"
+                    },
+                    {
+                      "name": "hour_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Filter Hour",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "hour",
+                    "queryName": "dashboards/01f18e2a8cc01eb983b5c49708ddaa85/datasets/01f18e6809c91ffc8bd6bed019fce835_hour"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}

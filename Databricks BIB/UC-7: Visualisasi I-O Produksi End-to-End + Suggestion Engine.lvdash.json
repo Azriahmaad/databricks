@@ -1,0 +1,1377 @@
+{
+  "datasets": [
+    {
+      "name": "contractor_daily",
+      "displayName": "Contractor Daily",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  uc.uc07.gold_contractor_daily\n",
+        "ORDER BY\n",
+        "  production_date DESC,\n",
+        "  netto_ton DESC"
+      ]
+    },
+    {
+      "name": "stockpile_balance",
+      "displayName": "Stockpile Balance Hourly",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  uc.uc07.gold_stockpile_balance_hourly\n",
+        "ORDER BY\n",
+        "  hour_start_utc"
+      ]
+    },
+    {
+      "name": "kpi_snapshot",
+      "displayName": "KPI Snapshot",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  uc.uc07.gold_kpi_snapshot\n",
+        "ORDER BY\n",
+        "  production_date DESC"
+      ]
+    },
+    {
+      "name": "funnel_stage_daily",
+      "displayName": "Funnel Stage Daily",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  uc.uc07.gold_funnel_stage_daily\n",
+        "WHERE\n",
+        "  is_estimated = false\n",
+        "ORDER BY\n",
+        "  production_date,\n",
+        "  stage_seq"
+      ]
+    },
+    {
+      "name": "stage_reconciliation",
+      "displayName": "Stage Reconciliation",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  uc.uc07.gold_stage_reconciliation\n",
+        "WHERE\n",
+        "  loss_pct IS NOT NULL\n",
+        "  AND severity != 'NO_DATA'\n",
+        "ORDER BY\n",
+        "  production_date,\n",
+        "  upstream_stage"
+      ]
+    },
+    {
+      "name": "suggestion_daily",
+      "displayName": "Suggestion Daily",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  uc.uc07.gold_suggestion_daily\n",
+        "ORDER BY\n",
+        "  production_date DESC,\n",
+        "  rank"
+      ]
+    },
+    {
+      "name": "production_timeseries",
+      "displayName": "Production Timeseries",
+      "queryLines": [
+        "SELECT\n",
+        "  period_start,\n",
+        "  'Aktual' AS series,\n",
+        "  actual_ton AS tonnage\n",
+        "FROM\n",
+        "  uc.uc07.gold_production_timeseries\n",
+        "WHERE\n",
+        "  grain = 'DAILY'\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  period_start,\n",
+        "  'Target' AS series,\n",
+        "  target_ton AS tonnage\n",
+        "FROM\n",
+        "  uc.uc07.gold_production_timeseries\n",
+        "WHERE\n",
+        "  grain = 'DAILY'\n",
+        "ORDER BY\n",
+        "  period_start,\n",
+        "  series"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "287ee23d",
+      "displayName": "Overview & Funnel",
+      "layout": [
+        {
+          "widget": {
+            "name": "title_header",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## UC-07: Visualisasi I/O Produksi End-to-End\n",
+                "Rekonsiliasi produksi batu bara: ROM → Hauling → Stockpile → Crushing Plant → Shipment"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_hauling",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_snapshot",
+                  "fields": [
+                    {
+                      "name": "sum(hauling_ton)",
+                      "expression": "SUM(`hauling_ton`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Hauling (ton)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(hauling_ton)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_trips",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_snapshot",
+                  "fields": [
+                    {
+                      "name": "sum(total_trips)",
+                      "expression": "SUM(`total_trips`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Trips",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_trips)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 1,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_shortfall",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_snapshot",
+                  "fields": [
+                    {
+                      "name": "sum(shortfall_ton)",
+                      "expression": "SUM(`shortfall_ton`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Shortfall vs Target (ton)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(shortfall_ton)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 1,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_recovery",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_snapshot",
+                  "fields": [
+                    {
+                      "name": "avg(achievement_pct)",
+                      "expression": "AVG(`achievement_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Achievement vs Target (%)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(achievement_pct)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 1,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "funnel_chart",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "funnel_stage_daily",
+                  "fields": [
+                    {
+                      "name": "stage_name",
+                      "expression": "`stage_name`"
+                    },
+                    {
+                      "name": "sum(tonnage_ton)",
+                      "expression": "SUM(`tonnage_ton`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Funnel Produksi per Stage (Total Tonase)",
+                "showTitle": true
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "sum(tonnage_ton)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact"
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "stage_name",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "custom-order",
+                      "orderedValues": [
+                        "ROM Production",
+                        "Hauling (WIM/Ucan)",
+                        "Direct ROM -> CP",
+                        "Stockpile IN",
+                        "Stockpile OUT/Reclaim",
+                        "Crushing Plant Intake",
+                        "Shipment"
+                      ]
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "stage_name",
+                  "legend": {
+                    "hide": true
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "timeseries_chart",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "production_timeseries",
+                  "fields": [
+                    {
+                      "name": "series",
+                      "expression": "`series`"
+                    },
+                    {
+                      "name": "period_start",
+                      "expression": "`period_start`"
+                    },
+                    {
+                      "name": "tonnage",
+                      "expression": "`tonnage`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Produksi Harian vs Target",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "period_start",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "tonnage",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "series",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 3,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "funnel_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "funnel_stage_daily",
+                  "fields": [
+                    {
+                      "name": "production_date",
+                      "expression": "`production_date`"
+                    },
+                    {
+                      "name": "stage_name",
+                      "expression": "`stage_name`"
+                    },
+                    {
+                      "name": "tonnage_ton",
+                      "expression": "`tonnage_ton`"
+                    },
+                    {
+                      "name": "trips",
+                      "expression": "`trips`"
+                    },
+                    {
+                      "name": "pct_of_baseline",
+                      "expression": "`pct_of_baseline`"
+                    },
+                    {
+                      "name": "source_system",
+                      "expression": "`source_system`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Detail Funnel per Hari",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "production_date"
+                  },
+                  {
+                    "fieldName": "stage_name"
+                  },
+                  {
+                    "fieldName": "tonnage_ton"
+                  },
+                  {
+                    "fieldName": "trips"
+                  },
+                  {
+                    "fieldName": "pct_of_baseline"
+                  },
+                  {
+                    "fieldName": "source_system"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "reconciliation",
+      "displayName": "Rekonsiliasi & Loss",
+      "layout": [
+        {
+          "widget": {
+            "name": "header",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Rekonsiliasi & Selisih Volumetrik\n",
+                "Selisih tonase antar tahap produksi dan persentase loss/recovery.\n",
+                "\n",
+                "> **⚠️ Data Gap:** Saat ini hanya pasangan *Stockpile IN vs OUT* yang memiliki data valid. Pasangan lain (ROM vs Timbang, Timbang vs CP, CP vs Shipment) belum tersedia karena periode data Urise (Jun) dan WIM (Jul-Aug) tidak overlap. Setelah data Urise Juli tersedia, rekonsiliasi penuh akan aktif."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "loss_pct_chart",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "stage_reconciliation",
+                  "fields": [
+                    {
+                      "name": "severity",
+                      "expression": "`severity`"
+                    },
+                    {
+                      "name": "pair_label",
+                      "expression": "`pair_label`"
+                    },
+                    {
+                      "name": "avg(loss_pct)",
+                      "expression": "AVG(`loss_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Loss % per Pasangan Stage",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "pair_label",
+                  "displayName": "pair_label",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(loss_pct)",
+                  "displayName": "loss_pct",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "severity",
+                  "displayName": "pair_label",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "delta_line",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "stage_reconciliation",
+                  "fields": [
+                    {
+                      "name": "pair_label",
+                      "expression": "`pair_label`"
+                    },
+                    {
+                      "name": "production_date",
+                      "expression": "`production_date`"
+                    },
+                    {
+                      "name": "sum(delta_ton)",
+                      "expression": "SUM(`delta_ton`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Selisih Tonase Harian per Stage",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "production_date",
+                  "displayName": "production_date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(delta_ton)",
+                  "displayName": "delta_ton",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "pair_label",
+                  "displayName": "production_date",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 1,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "recon_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "stage_reconciliation",
+                  "fields": [
+                    {
+                      "name": "production_date",
+                      "expression": "`production_date`"
+                    },
+                    {
+                      "name": "pair_label",
+                      "expression": "`pair_label`"
+                    },
+                    {
+                      "name": "upstream_ton",
+                      "expression": "`upstream_ton`"
+                    },
+                    {
+                      "name": "downstream_ton",
+                      "expression": "`downstream_ton`"
+                    },
+                    {
+                      "name": "delta_ton",
+                      "expression": "`delta_ton`"
+                    },
+                    {
+                      "name": "loss_pct",
+                      "expression": "`loss_pct`"
+                    },
+                    {
+                      "name": "recovery_pct",
+                      "expression": "`recovery_pct`"
+                    },
+                    {
+                      "name": "severity",
+                      "expression": "`severity`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Detail Rekonsiliasi",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "production_date"
+                  },
+                  {
+                    "fieldName": "pair_label"
+                  },
+                  {
+                    "fieldName": "upstream_ton"
+                  },
+                  {
+                    "fieldName": "downstream_ton"
+                  },
+                  {
+                    "fieldName": "delta_ton"
+                  },
+                  {
+                    "fieldName": "loss_pct"
+                  },
+                  {
+                    "fieldName": "recovery_pct"
+                  },
+                  {
+                    "fieldName": "severity"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "stockpile_line",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "stockpile_balance",
+                  "fields": [
+                    {
+                      "name": "buffer_status",
+                      "expression": "`buffer_status`"
+                    },
+                    {
+                      "name": "hour_start_utc",
+                      "expression": "`hour_start_utc`"
+                    },
+                    {
+                      "name": "sum(balance_ton)",
+                      "expression": "SUM(`balance_ton`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Saldo Stockpile (Balance Hourly)",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "hour_start_utc",
+                  "displayName": "hour_start_utc",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(balance_ton)",
+                  "displayName": "balance_ton",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "buffer_status",
+                  "displayName": "hour_start_utc",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 12,
+            "height": 4
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "contractor",
+      "displayName": "Performa Kontraktor",
+      "layout": [
+        {
+          "widget": {
+            "name": "header",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Performa Kontraktor Hauling\n",
+                "Tonase, ritase, payload, dan analisis balancing per kontraktor"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "tonnage_bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "contractor_daily",
+                  "fields": [
+                    {
+                      "name": "contractor_code",
+                      "expression": "`contractor_code`"
+                    },
+                    {
+                      "name": "sum(netto_ton)",
+                      "expression": "SUM(`netto_ton`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Tonase per Kontraktor",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "contractor_code",
+                  "displayName": "contractor_code",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(netto_ton)",
+                  "displayName": "netto_ton",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "contractor_code",
+                  "displayName": "contractor_code",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "share_pie",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "contractor_daily",
+                  "fields": [
+                    {
+                      "name": "avg(share_pct)",
+                      "expression": "AVG(`share_pct`)"
+                    },
+                    {
+                      "name": "contractor_code",
+                      "expression": "`contractor_code`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Share % Kontraktor",
+                "showTitle": true
+              },
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "avg(share_pct)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "share_pct"
+                },
+                "color": {
+                  "fieldName": "contractor_code",
+                  "displayName": "contractor_code",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 1,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "contractor_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "contractor_daily",
+                  "fields": [
+                    {
+                      "name": "production_date",
+                      "expression": "`production_date`"
+                    },
+                    {
+                      "name": "contractor_code",
+                      "expression": "`contractor_code`"
+                    },
+                    {
+                      "name": "contractor_name",
+                      "expression": "`contractor_name`"
+                    },
+                    {
+                      "name": "netto_ton",
+                      "expression": "`netto_ton`"
+                    },
+                    {
+                      "name": "trips",
+                      "expression": "`trips`"
+                    },
+                    {
+                      "name": "active_trucks",
+                      "expression": "`active_trucks`"
+                    },
+                    {
+                      "name": "avg_payload_ton",
+                      "expression": "`avg_payload_ton`"
+                    },
+                    {
+                      "name": "share_pct",
+                      "expression": "`share_pct`"
+                    },
+                    {
+                      "name": "deviation_vs_fleet_pct",
+                      "expression": "`deviation_vs_fleet_pct`"
+                    },
+                    {
+                      "name": "balancing_flag",
+                      "expression": "`balancing_flag`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Detail Kontraktor",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "production_date"
+                  },
+                  {
+                    "fieldName": "contractor_code"
+                  },
+                  {
+                    "fieldName": "contractor_name"
+                  },
+                  {
+                    "fieldName": "netto_ton"
+                  },
+                  {
+                    "fieldName": "trips"
+                  },
+                  {
+                    "fieldName": "active_trucks"
+                  },
+                  {
+                    "fieldName": "avg_payload_ton"
+                  },
+                  {
+                    "fieldName": "share_pct"
+                  },
+                  {
+                    "fieldName": "deviation_vs_fleet_pct"
+                  },
+                  {
+                    "fieldName": "balancing_flag"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 12,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "suggestion",
+      "displayName": "Suggestion Engine",
+      "layout": [
+        {
+          "widget": {
+            "name": "header",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Suggestion Engine - Rekomendasi Harian\n",
+                "Top 3 rekomendasi proaktif untuk meningkatkan throughput produksi, dihasilkan oleh Mosaic AI"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "gain_by_cat",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "suggestion_daily",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "sum(expected_gain_ton)",
+                      "expression": "SUM(`expected_gain_ton`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Rekomendasi per Kategori",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "category",
+                  "displayName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(expected_gain_ton)",
+                  "displayName": "expected_gain_ton",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "category",
+                  "displayName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "confidence_chart",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "suggestion_daily",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "avg(confidence)",
+                      "expression": "AVG(`confidence`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Confidence Score",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "category",
+                  "displayName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(confidence)",
+                  "displayName": "confidence",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "category",
+                  "displayName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 1,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "suggestion_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "suggestion_daily",
+                  "fields": [
+                    {
+                      "name": "production_date",
+                      "expression": "`production_date`"
+                    },
+                    {
+                      "name": "rank",
+                      "expression": "`rank`"
+                    },
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "title",
+                      "expression": "`title`"
+                    },
+                    {
+                      "name": "recommendation",
+                      "expression": "`recommendation`"
+                    },
+                    {
+                      "name": "owner",
+                      "expression": "`owner`"
+                    },
+                    {
+                      "name": "expected_gain_ton",
+                      "expression": "`expected_gain_ton`"
+                    },
+                    {
+                      "name": "priority",
+                      "expression": "`priority`"
+                    },
+                    {
+                      "name": "confidence",
+                      "expression": "`confidence`"
+                    },
+                    {
+                      "name": "generated_by",
+                      "expression": "`generated_by`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Top Rekomendasi Harian",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "production_date"
+                  },
+                  {
+                    "fieldName": "rank"
+                  },
+                  {
+                    "fieldName": "category"
+                  },
+                  {
+                    "fieldName": "title"
+                  },
+                  {
+                    "fieldName": "recommendation"
+                  },
+                  {
+                    "fieldName": "owner"
+                  },
+                  {
+                    "fieldName": "expected_gain_ton"
+                  },
+                  {
+                    "fieldName": "priority"
+                  },
+                  {
+                    "fieldName": "confidence"
+                  },
+                  {
+                    "fieldName": "generated_by"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 7
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}

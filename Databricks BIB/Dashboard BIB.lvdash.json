@@ -1,0 +1,6327 @@
+{
+  "datasets": [
+    {
+      "name": "rom_tonase_by_kontraktor",
+      "displayName": "03 ROM Data per Hour",
+      "queryLines": [
+        "WITH date_params AS (\n",
+        "  SELECT\n",
+        "    COALESCE(:date_from, DATE '2026-07-12') as date_from,\n",
+        "    COALESCE(:date_to, COALESCE(:date_from, DATE '2026-07-12')) as date_to,\n",
+        "    COALESCE(:shift_from, 'ALL') as shift_from,\n",
+        "    COALESCE(:shift_to, 'ALL') as shift_to,\n",
+        "    COALESCE(NULLIF(:hour_from, 'ALL'), '-1') as hour_from,\n",
+        "    COALESCE(NULLIF(:hour_to, 'ALL'), '-1') as hour_to\n",
+        ")\n",
+        "SELECT\n",
+        "  r.op_date,\n",
+        "  r.master_location,\n",
+        "  r.kontraktor,\n",
+        "  r.hour,\n",
+        "  r.shift,\n",
+        "  r.tonase,\n",
+        "  r.jumlah_unit_aktif,\n",
+        "  r.jumlah_transaksi\n",
+        "FROM\n",
+        "  uc.urise.rom r CROSS JOIN date_params p\n",
+        "WHERE\n",
+        "  (\n",
+        "    -- Single date case\n",
+        "    (\n",
+        "      p.date_from = p.date_to\n",
+        "      AND r.op_date = p.date_from\n",
+        "      AND (\n",
+        "        (\n",
+        "          p.shift_from = 'ALL'\n",
+        "          AND p.shift_to = 'ALL'\n",
+        "        )\n",
+        "        OR (\n",
+        "          p.shift_from != 'ALL'\n",
+        "          AND p.shift_to = 'ALL'\n",
+        "          AND r.shift = p.shift_from\n",
+        "        )\n",
+        "        OR (\n",
+        "          p.shift_from = 'ALL'\n",
+        "          AND p.shift_to != 'ALL'\n",
+        "          AND r.shift = p.shift_to\n",
+        "        )\n",
+        "        OR (\n",
+        "          p.shift_from != 'ALL'\n",
+        "          AND p.shift_to != 'ALL'\n",
+        "          AND r.shift IN (p.shift_from, p.shift_to)\n",
+        "        )\n",
+        "      )\n",
+        "      AND (\n",
+        "        (\n",
+        "          p.hour_from = '-1'\n",
+        "          AND p.hour_to = '-1'\n",
+        "        )\n",
+        "        OR (\n",
+        "          p.hour_from != '-1'\n",
+        "          AND p.hour_to = '-1'\n",
+        "          AND r.hour >= CAST(p.hour_from AS INT)\n",
+        "        )\n",
+        "        OR (\n",
+        "          p.hour_from = '-1'\n",
+        "          AND p.hour_to != '-1'\n",
+        "          AND r.hour <= CAST(p.hour_to AS INT)\n",
+        "        )\n",
+        "        OR (\n",
+        "          p.hour_from != '-1'\n",
+        "          AND p.hour_to != '-1'\n",
+        "          AND (\n",
+        "            (\n",
+        "              CAST(p.hour_from AS INT) <= CAST(p.hour_to AS INT)\n",
+        "              AND r.hour BETWEEN CAST(p.hour_from AS INT) AND CAST(p.hour_to AS INT)\n",
+        "            )\n",
+        "            OR (\n",
+        "              CAST(p.hour_from AS INT) > CAST(p.hour_to AS INT)\n",
+        "              AND (\n",
+        "                r.hour >= CAST(p.hour_from AS INT)\n",
+        "                OR r.hour <= CAST(p.hour_to AS INT)\n",
+        "              )\n",
+        "            )\n",
+        "          )\n",
+        "        )\n",
+        "      )\n",
+        "    )\n",
+        "    OR ( -- Start date with filters\n",
+        "      p.date_from < p.date_to\n",
+        "      AND r.op_date = p.date_from\n",
+        "      AND (\n",
+        "        (p.shift_from = 'ALL')\n",
+        "        OR r.shift = p.shift_from\n",
+        "      )\n",
+        "      AND (\n",
+        "        (p.hour_from = '-1')\n",
+        "        OR r.hour >= CAST(p.hour_from AS INT)\n",
+        "      )\n",
+        "    )\n",
+        "    OR ( -- Middle dates (no filters)\n",
+        "      p.date_from < p.date_to\n",
+        "      AND r.op_date > p.date_from\n",
+        "      AND r.op_date <= p.date_to\n",
+        "      AND p.shift_to = 'ALL'\n",
+        "      AND p.hour_to = '-1'\n",
+        "    )\n",
+        "    OR ( -- End date with filters\n",
+        "      p.date_from < p.date_to\n",
+        "      AND r.op_date = p.date_to\n",
+        "      AND (\n",
+        "        p.shift_to != 'ALL'\n",
+        "        OR p.hour_to != '-1'\n",
+        "      )\n",
+        "      AND (\n",
+        "        (p.shift_to = 'ALL')\n",
+        "        OR r.shift = p.shift_to\n",
+        "      )\n",
+        "      AND (\n",
+        "        (p.hour_to = '-1')\n",
+        "        OR r.hour <= CAST(p.hour_to AS INT)\n",
+        "      )\n",
+        "    )\n",
+        "  )\n",
+        "ORDER BY\n",
+        "  op_date,\n",
+        "  master_location,\n",
+        "  kontraktor,\n",
+        "  hour"
+      ],
+      "parameters": [
+        {
+          "displayName": "Tanggal Dari",
+          "keyword": "date_from",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-06-18T00:00:00.000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Shift Dari",
+          "keyword": "shift_from",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "ALL"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Jam Dari",
+          "keyword": "hour_from",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "ALL"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Tanggal Sampai",
+          "keyword": "date_to",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-06-18T00:00:00.000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Shift Sampai",
+          "keyword": "shift_to",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "ALL"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Jam Sampai",
+          "keyword": "hour_to",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "ALL"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "columns": [
+        {
+          "displayName": "Total Tonase per Kontraktor",
+          "description": "",
+          "expression": "SUM(`tonase`)"
+        }
+      ],
+      "catalog": "urise_etc",
+      "schema": "03_gold"
+    },
+    {
+      "name": "hour_options",
+      "displayName": "03 Hour Options",
+      "queryLines": [
+        "SELECT\n",
+        "  'ALL' as hour_value,\n",
+        "  'Semua Jam' as hour_label,\n",
+        "  -1 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '6' as hour_value,\n",
+        "  '06:00 (DS)' as hour_label,\n",
+        "  6 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '7' as hour_value,\n",
+        "  '07:00 (DS)' as hour_label,\n",
+        "  7 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '8' as hour_value,\n",
+        "  '08:00 (DS)' as hour_label,\n",
+        "  8 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '9' as hour_value,\n",
+        "  '09:00 (DS)' as hour_label,\n",
+        "  9 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '10' as hour_value,\n",
+        "  '10:00 (DS)' as hour_label,\n",
+        "  10 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '11' as hour_value,\n",
+        "  '11:00 (DS)' as hour_label,\n",
+        "  11 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '12' as hour_value,\n",
+        "  '12:00 (DS)' as hour_label,\n",
+        "  12 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '13' as hour_value,\n",
+        "  '13:00 (DS)' as hour_label,\n",
+        "  13 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '14' as hour_value,\n",
+        "  '14:00 (DS)' as hour_label,\n",
+        "  14 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '15' as hour_value,\n",
+        "  '15:00 (DS)' as hour_label,\n",
+        "  15 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '16' as hour_value,\n",
+        "  '16:00 (DS)' as hour_label,\n",
+        "  16 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '17' as hour_value,\n",
+        "  '17:00 (DS)' as hour_label,\n",
+        "  17 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '18' as hour_value,\n",
+        "  '18:00 (NS)' as hour_label,\n",
+        "  18 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '19' as hour_value,\n",
+        "  '19:00 (NS)' as hour_label,\n",
+        "  19 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '20' as hour_value,\n",
+        "  '20:00 (NS)' as hour_label,\n",
+        "  20 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '21' as hour_value,\n",
+        "  '21:00 (NS)' as hour_label,\n",
+        "  21 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '22' as hour_value,\n",
+        "  '22:00 (NS)' as hour_label,\n",
+        "  22 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '23' as hour_value,\n",
+        "  '23:00 (NS)' as hour_label,\n",
+        "  23 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '0' as hour_value,\n",
+        "  '00:00 (NS)' as hour_label,\n",
+        "  24 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '1' as hour_value,\n",
+        "  '01:00 (NS)' as hour_label,\n",
+        "  25 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '2' as hour_value,\n",
+        "  '02:00 (NS)' as hour_label,\n",
+        "  26 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '3' as hour_value,\n",
+        "  '03:00 (NS)' as hour_label,\n",
+        "  27 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '4' as hour_value,\n",
+        "  '04:00 (NS)' as hour_label,\n",
+        "  28 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  '5' as hour_value,\n",
+        "  '05:00 (NS)' as hour_label,\n",
+        "  29 as sort_order\n",
+        "ORDER BY\n",
+        "  sort_order"
+      ]
+    },
+    {
+      "name": "shift_options",
+      "displayName": "03 Shift Options",
+      "queryLines": [
+        "SELECT\n",
+        "  'ALL' as shift_value,\n",
+        "  'Semua' as shift_label,\n",
+        "  0 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  'DS' as shift_value,\n",
+        "  'DS' as shift_label,\n",
+        "  1 as sort_order\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  'NS' as shift_value,\n",
+        "  'NS' as shift_label,\n",
+        "  2 as sort_order\n",
+        "ORDER BY\n",
+        "  sort_order"
+      ]
+    },
+    {
+      "name": "heatmap_hourly_singleday",
+      "displayName": "03 Heatmap Hourly (Single Day)",
+      "queryLines": [
+        "WITH date_params AS (\n",
+        "  SELECT\n",
+        "    COALESCE(:date_from, DATE '2026-07-12') as date_from,\n",
+        "    COALESCE(:date_to, COALESCE(:date_from, DATE '2026-07-12')) as date_to,\n",
+        "    COALESCE(:shift_from, 'ALL') as shift_from,\n",
+        "    COALESCE(:shift_to, 'ALL') as shift_to,\n",
+        "    COALESCE(NULLIF(:hour_from, 'ALL'), '-1') as hour_from,\n",
+        "    COALESCE(NULLIF(:hour_to, 'ALL'), '-1') as hour_to\n",
+        ")\n",
+        "SELECT\n",
+        "  r.master_location,\n",
+        "  r.hour,\n",
+        "  r.op_hour as sort_order,\n",
+        "  date_format(timestampadd(HOUR, r.hour, r.date), 'yyyy-MM-dd HH') as rdate,\n",
+        "  SUM(r.jumlah_unit_aktif) as sum_jumlah_unit_aktif\n",
+        "FROM\n",
+        "  uc.urise.rom r CROSS JOIN date_params p\n",
+        "WHERE\n",
+        "  -- CONDITIONAL VISIBILITY: tampil hanya jika single day\n",
+        "  p.date_from = p.date_to\n",
+        "  AND r.op_date = p.date_from\n",
+        "  AND (\n",
+        "    (\n",
+        "      p.shift_from = 'ALL'\n",
+        "      AND p.shift_to = 'ALL'\n",
+        "    )\n",
+        "    OR (\n",
+        "      p.shift_from != 'ALL'\n",
+        "      AND p.shift_to = 'ALL'\n",
+        "      AND r.shift = p.shift_from\n",
+        "    )\n",
+        "    OR (\n",
+        "      p.shift_from = 'ALL'\n",
+        "      AND p.shift_to != 'ALL'\n",
+        "      AND r.shift = p.shift_to\n",
+        "    )\n",
+        "    OR (\n",
+        "      p.shift_from != 'ALL'\n",
+        "      AND p.shift_to != 'ALL'\n",
+        "      AND r.shift IN (p.shift_from, p.shift_to)\n",
+        "    )\n",
+        "  )\n",
+        "  AND (\n",
+        "    (\n",
+        "      p.hour_from = '-1'\n",
+        "      AND p.hour_to = '-1'\n",
+        "    )\n",
+        "    OR (\n",
+        "      p.hour_from != '-1'\n",
+        "      AND p.hour_to = '-1'\n",
+        "      AND r.hour >= CAST(p.hour_from AS INT)\n",
+        "    )\n",
+        "    OR (\n",
+        "      p.hour_from = '-1'\n",
+        "      AND p.hour_to != '-1'\n",
+        "      AND r.hour <= CAST(p.hour_to AS INT)\n",
+        "    )\n",
+        "    OR (\n",
+        "      p.hour_from != '-1'\n",
+        "      AND p.hour_to != '-1'\n",
+        "      AND (\n",
+        "        (\n",
+        "          CAST(p.hour_from AS INT) <= CAST(p.hour_to AS INT)\n",
+        "          AND r.hour BETWEEN CAST(p.hour_from AS INT) AND CAST(p.hour_to AS INT)\n",
+        "        )\n",
+        "        OR (\n",
+        "          CAST(p.hour_from AS INT) > CAST(p.hour_to AS INT)\n",
+        "          AND (\n",
+        "            r.hour >= CAST(p.hour_from AS INT)\n",
+        "            OR r.hour <= CAST(p.hour_to AS INT)\n",
+        "          )\n",
+        "        )\n",
+        "      )\n",
+        "    )\n",
+        "  )\n",
+        "GROUP BY\n",
+        "  r.master_location,\n",
+        "  r.hour,\n",
+        "  r.date,\n",
+        "  r.op_hour,\n",
+        "  date_format(timestampadd(HOUR, r.hour, r.date), 'yyyy-MM-dd HH')\n",
+        "ORDER BY\n",
+        "  r.master_location,\n",
+        "  r.date,\n",
+        "  r.op_hour,\n",
+        "  rdate"
+      ],
+      "parameters": [
+        {
+          "displayName": "Tanggal Dari",
+          "keyword": "date_from",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-06-18T00:00:00.000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Tanggal Sampai",
+          "keyword": "date_to",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-06-18T00:00:00.000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Shift Dari",
+          "keyword": "shift_from",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "ALL"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Shift Sampai",
+          "keyword": "shift_to",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "ALL"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Jam Dari",
+          "keyword": "hour_from",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "ALL"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Jam Sampai",
+          "keyword": "hour_to",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "ALL"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "heatmap_daily_multiday",
+      "displayName": "03 Heatmap Daily (Multi Day)",
+      "queryLines": [
+        "WITH date_params AS (\n",
+        "  SELECT\n",
+        "    COALESCE(:date_from, DATE '2026-07-12') as date_from,\n",
+        "    COALESCE(:date_to, COALESCE(:date_from, DATE '2026-07-12')) as date_to,\n",
+        "    COALESCE(:shift_from, 'ALL') as shift_from,\n",
+        "    COALESCE(:shift_to, 'ALL') as shift_to,\n",
+        "    COALESCE(NULLIF(:hour_from, 'ALL'), '-1') as hour_from,\n",
+        "    COALESCE(NULLIF(:hour_to, 'ALL'), '-1') as hour_to\n",
+        ")\n",
+        "SELECT\n",
+        "  r.op_date,\n",
+        "  r.master_location,\n",
+        "  SUM(r.jumlah_unit_aktif) as sum_jumlah_unit_aktif\n",
+        "FROM\n",
+        "  uc.urise.rom r CROSS JOIN date_params p\n",
+        "WHERE\n",
+        "  -- CONDITIONAL VISIBILITY: tampil hanya jika multi-day\n",
+        "  p.date_from < p.date_to\n",
+        "  AND (\n",
+        "    ( -- Start date with filters\n",
+        "      r.op_date = p.date_from\n",
+        "      AND (\n",
+        "        (p.shift_from = 'ALL')\n",
+        "        OR r.shift = p.shift_from\n",
+        "      )\n",
+        "      AND (\n",
+        "        (p.hour_from = '-1')\n",
+        "        OR r.hour >= CAST(p.hour_from AS INT)\n",
+        "      )\n",
+        "    )\n",
+        "    OR ( -- Middle dates (no filters) - include end date\n",
+        "      r.op_date > p.date_from\n",
+        "      AND r.op_date <= p.date_to\n",
+        "      AND p.shift_to = 'ALL'\n",
+        "      AND p.hour_to = '-1'\n",
+        "    )\n",
+        "    OR ( -- End date with filters\n",
+        "      r.op_date = p.date_to\n",
+        "      AND (\n",
+        "        p.shift_to != 'ALL'\n",
+        "        OR p.hour_to != '-1'\n",
+        "      )\n",
+        "      AND (\n",
+        "        (p.shift_to = 'ALL')\n",
+        "        OR r.shift = p.shift_to\n",
+        "      )\n",
+        "      AND (\n",
+        "        (p.hour_to = '-1')\n",
+        "        OR r.hour <= CAST(p.hour_to AS INT)\n",
+        "      )\n",
+        "    )\n",
+        "  )\n",
+        "GROUP BY\n",
+        "  r.op_date,\n",
+        "  r.master_location\n",
+        "ORDER BY\n",
+        "  r.op_date,\n",
+        "  r.master_location"
+      ],
+      "parameters": [
+        {
+          "displayName": "Tanggal Dari",
+          "keyword": "date_from",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-12"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Tanggal Sampai",
+          "keyword": "date_to",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-14"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Shift Dari",
+          "keyword": "shift_from",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "ALL"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Shift Sampai",
+          "keyword": "shift_to",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "ALL"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Jam Dari",
+          "keyword": "hour_from",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "ALL"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Jam Sampai",
+          "keyword": "hour_to",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "ALL"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_data_check",
+      "displayName": "03 Debug Data Check",
+      "queryLines": [
+        "SELECT\n",
+        "  op_date,\n",
+        "  COUNT(*) as row_count,\n",
+        "  COUNT(DISTINCT master_location) as location_count,\n",
+        "  SUM(jumlah_unit_aktif) as total_units\n",
+        "FROM\n",
+        "  uc.urise.rom\n",
+        "WHERE\n",
+        "  op_date BETWEEN DATE '2026-06-18' AND DATE '2026-06-19'\n",
+        "GROUP BY\n",
+        "  op_date\n",
+        "ORDER BY\n",
+        "  op_date"
+      ]
+    },
+    {
+      "name": "simple_data_check",
+      "displayName": "03 Simple Data Check June",
+      "queryLines": [
+        "SELECT DISTINCT\n",
+        "  op_date\n",
+        "FROM\n",
+        "  uc.urise.rom\n",
+        "WHERE\n",
+        "  op_date >= DATE '2026-06-01'\n",
+        "  AND op_date < DATE '2026-07-01'\n",
+        "ORDER BY\n",
+        "  op_date\n",
+        "LIMIT 50"
+      ]
+    },
+    {
+      "name": "test_multiday_july",
+      "displayName": "03Test Multi Day July 12-14",
+      "queryLines": [
+        "WITH date_params AS (\n",
+        "  SELECT\n",
+        "    DATE '2026-07-12' as date_from,\n",
+        "    DATE '2026-07-14' as date_to,\n",
+        "    'ALL' as shift_from,\n",
+        "    'ALL' as shift_to,\n",
+        "    '-1' as hour_from,\n",
+        "    '-1' as hour_to\n",
+        ")\n",
+        "SELECT\n",
+        "  r.op_date,\n",
+        "  r.master_location,\n",
+        "  SUM(r.jumlah_unit_aktif) as sum_jumlah_unit_aktif\n",
+        "FROM\n",
+        "  uc.urise.rom r CROSS JOIN date_params p\n",
+        "WHERE\n",
+        "  p.date_from < p.date_to\n",
+        "  AND (\n",
+        "    (\n",
+        "      r.op_date = p.date_from\n",
+        "      AND (\n",
+        "        (p.shift_from = 'ALL')\n",
+        "        OR r.shift = p.shift_from\n",
+        "      )\n",
+        "      AND (\n",
+        "        (p.hour_from = '-1')\n",
+        "        OR r.hour >= CAST(p.hour_from AS INT)\n",
+        "      )\n",
+        "    )\n",
+        "    OR (\n",
+        "      r.op_date > p.date_from\n",
+        "      AND r.op_date <= p.date_to\n",
+        "      AND p.shift_to = 'ALL'\n",
+        "      AND p.hour_to = '-1'\n",
+        "    )\n",
+        "    OR (\n",
+        "      r.op_date = p.date_to\n",
+        "      AND (\n",
+        "        p.shift_to != 'ALL'\n",
+        "        OR p.hour_to != '-1'\n",
+        "      )\n",
+        "      AND (\n",
+        "        (p.shift_to = 'ALL')\n",
+        "        OR r.shift = p.shift_to\n",
+        "      )\n",
+        "      AND (\n",
+        "        (p.hour_to = '-1')\n",
+        "        OR r.hour <= CAST(p.hour_to AS INT)\n",
+        "      )\n",
+        "    )\n",
+        "  )\n",
+        "GROUP BY\n",
+        "  r.op_date,\n",
+        "  r.master_location\n",
+        "ORDER BY\n",
+        "  r.op_date,\n",
+        "  r.master_location\n",
+        "LIMIT 10"
+      ]
+    },
+    {
+      "name": "uc04_stockpile_gold",
+      "displayName": "04 Stockpile Gold",
+      "queryLines": [
+        "SELECT\n",
+        "  op_date,\n",
+        "  shift,\n",
+        "  CAST(hour AS INT) AS hour,\n",
+        "  jumlah_inbound,\n",
+        "  jumlah_outbound,\n",
+        "  jumlah_aktif_geofence,\n",
+        "  jumlah_tonase,\n",
+        "  tonase_inbound,\n",
+        "  tonase_outbound,\n",
+        "  tonase_inbound - tonase_outbound as stock\n",
+        "FROM\n",
+        "  uc.urise.stockpile_gold\n",
+        "ORDER BY\n",
+        "  op_date,\n",
+        "  shift,\n",
+        "  hour"
+      ]
+    },
+    {
+      "name": "01_top5_worst_hours",
+      "displayName": "01 Top 5 Waktu Jarak Aman Paling Jelek",
+      "queryLines": [
+        "SELECT\n",
+        "  Interval AS range_waktu,\n",
+        "  AVG(rerata_jarak_waktu)::INT AS avg_ttc\n",
+        "FROM\n",
+        "  uc.famous.gold_v_famous_jarak_aman_gps\n",
+        "WHERE\n",
+        "  week_of_year\n",
+        "    = (\n",
+        "      SELECT\n",
+        "        MAX(week_of_year)\n",
+        "      FROM\n",
+        "        uc.famous.gold_v_famous_jarak_aman_gps\n",
+        "    )\n",
+        "GROUP BY\n",
+        "  Interval\n",
+        "ORDER BY\n",
+        "  AVG(rerata_jarak_waktu) ASC\n",
+        "LIMIT 5"
+      ]
+    },
+    {
+      "name": "01_top5_dangerous_km",
+      "displayName": "01 Top 5 Lokasi Jarak Aman Paling Jelek",
+      "queryLines": [
+        "SELECT\n",
+        "  KM AS lokasi_km,\n",
+        "  AVG(rerata_jarak_waktu)::INT AS avg_ttc\n",
+        "FROM\n",
+        "  uc.famous.gold_v_famous_jarak_aman_km\n",
+        "WHERE\n",
+        "  week_of_year\n",
+        "    = (\n",
+        "      SELECT\n",
+        "        MAX(week_of_year)\n",
+        "      FROM\n",
+        "        uc.famous.gold_v_famous_jarak_aman_km\n",
+        "    )\n",
+        "  AND rerata_jarak_waktu IS NOT NULL\n",
+        "GROUP BY\n",
+        "  KM\n",
+        "ORDER BY\n",
+        "  AVG(rerata_jarak_waktu) ASC\n",
+        "LIMIT 5"
+      ]
+    },
+    {
+      "name": "01_heatmap_grup_truk",
+      "displayName": "01 Heatmap Grup Truk (s)",
+      "queryLines": [
+        "SELECT\n",
+        "  Hari,\n",
+        "  grup_truk_name AS group_truk,\n",
+        "  AVG(rerata_jarak_waktu) AS jarak_s\n",
+        "FROM\n",
+        "  uc.famous.gold_v_famous_jarak_aman_grup_truk\n",
+        "WHERE\n",
+        "  week_of_year\n",
+        "    = (\n",
+        "      SELECT\n",
+        "        MAX(week_of_year)\n",
+        "      FROM\n",
+        "        uc.famous.gold_v_famous_jarak_aman_grup_truk\n",
+        "    )\n",
+        "GROUP BY\n",
+        "  Hari,\n",
+        "  grup_truk_name\n",
+        "LIMIT 10000"
+      ]
+    },
+    {
+      "name": "01_top5_best_hours",
+      "displayName": "01 Top 5 Waktu Jarak Aman Paling Baik",
+      "queryLines": [
+        "SELECT\n",
+        "  Interval AS range_waktu,\n",
+        "  AVG(rerata_jarak_waktu)::INT AS avg_ttc\n",
+        "FROM\n",
+        "  uc.famous.gold_v_famous_jarak_aman_gps\n",
+        "WHERE\n",
+        "  week_of_year\n",
+        "    = (\n",
+        "      SELECT\n",
+        "        MAX(week_of_year)\n",
+        "      FROM\n",
+        "        uc.famous.gold_v_famous_jarak_aman_gps\n",
+        "    )\n",
+        "GROUP BY\n",
+        "  Interval\n",
+        "ORDER BY\n",
+        "  AVG(rerata_jarak_waktu) DESC\n",
+        "LIMIT 5"
+      ]
+    },
+    {
+      "name": "01_filter_week",
+      "displayName": "01 Filter Week",
+      "queryLines": [
+        "SELECT DISTINCT\n",
+        "  week_of_year\n",
+        "FROM\n",
+        "  uc.famous.gold_v_famous_jarak_aman_gps\n",
+        "ORDER BY\n",
+        "  week_of_year DESC\n",
+        "LIMIT 20"
+      ]
+    },
+    {
+      "name": "01_top5_safest_km",
+      "displayName": "01 Top 5 Lokasi Jarak Aman Paling Baik",
+      "queryLines": [
+        "SELECT\n",
+        "  KM AS lokasi_km,\n",
+        "  AVG(rerata_jarak_waktu)::INT AS avg_ttc\n",
+        "FROM\n",
+        "  uc.famous.gold_v_famous_jarak_aman_km\n",
+        "WHERE\n",
+        "  week_of_year\n",
+        "    = (\n",
+        "      SELECT\n",
+        "        MAX(week_of_year)\n",
+        "      FROM\n",
+        "        uc.famous.gold_v_famous_jarak_aman_km\n",
+        "    )\n",
+        "  AND rerata_jarak_waktu IS NOT NULL\n",
+        "GROUP BY\n",
+        "  KM\n",
+        "ORDER BY\n",
+        "  AVG(rerata_jarak_waktu) DESC\n",
+        "LIMIT 5"
+      ]
+    },
+    {
+      "name": "01_filter_hari",
+      "displayName": "01 Filter Hari",
+      "queryLines": [
+        "SELECT DISTINCT\n",
+        "  Hari\n",
+        "FROM\n",
+        "  uc.famous.gold_v_famous_jarak_aman_gps\n",
+        "ORDER BY\n",
+        "  CASE Hari\n",
+        "    WHEN 'Senin' THEN 1\n",
+        "    WHEN 'Selasa' THEN 2\n",
+        "    WHEN 'Rabu' THEN 3\n",
+        "    WHEN 'Kamis' THEN 4\n",
+        "    WHEN 'Jumat' THEN 5\n",
+        "    WHEN 'Sabtu' THEN 6\n",
+        "    WHEN 'Minggu' THEN 7\n",
+        "  END"
+      ]
+    },
+    {
+      "name": "01_heatmap_jarak_m",
+      "displayName": "01 Heatmap Jarak (m)",
+      "queryLines": [
+        "SELECT\n",
+        "  Hari,\n",
+        "  Interval,\n",
+        "  AVG(rerata_jarak) AS jarak_m\n",
+        "FROM\n",
+        "  uc.famous.gold_v_famous_jarak_aman_gps\n",
+        "WHERE\n",
+        "  week_of_year\n",
+        "    = (\n",
+        "      SELECT\n",
+        "        MAX(week_of_year)\n",
+        "      FROM\n",
+        "        uc.famous.gold_v_famous_jarak_aman_gps\n",
+        "    )\n",
+        "GROUP BY\n",
+        "  Hari,\n",
+        "  Interval\n",
+        "LIMIT 10000"
+      ]
+    },
+    {
+      "name": "01_heatmap_km_s",
+      "displayName": "01 Heatmap Geofence KM (s)",
+      "queryLines": [
+        "SELECT\n",
+        "  Hari,\n",
+        "  KM,\n",
+        "  AVG(rerata_jarak_waktu) AS jarak_s\n",
+        "FROM\n",
+        "  uc.famous.gold_v_famous_jarak_aman_km\n",
+        "WHERE\n",
+        "  week_of_year\n",
+        "    = (\n",
+        "      SELECT\n",
+        "        MAX(week_of_year)\n",
+        "      FROM\n",
+        "        uc.famous.gold_v_famous_jarak_aman_km\n",
+        "    )\n",
+        "GROUP BY\n",
+        "  Hari,\n",
+        "  KM\n",
+        "LIMIT 10000"
+      ]
+    },
+    {
+      "name": "01_heatmap_interval_hari",
+      "displayName": "01 Heatmap Waktu (s)",
+      "queryLines": [
+        "SELECT\n",
+        "  Hari,\n",
+        "  Interval,\n",
+        "  AVG(rerata_jarak_waktu) AS jarak_s\n",
+        "FROM\n",
+        "  uc.famous.gold_v_famous_jarak_aman_gps\n",
+        "WHERE\n",
+        "  week_of_year\n",
+        "    = (\n",
+        "      SELECT\n",
+        "        MAX(week_of_year)\n",
+        "      FROM\n",
+        "        uc.famous.gold_v_famous_jarak_aman_gps\n",
+        "    )\n",
+        "GROUP BY\n",
+        "  Hari,\n",
+        "  Interval\n",
+        "LIMIT 10000"
+      ]
+    },
+    {
+      "name": "02_sebaran_unit",
+      "displayName": "02 Sebaran Unit",
+      "queryLines": [
+        "WITH latest_position AS (\n",
+        "  SELECT\n",
+        "    p.*,\n",
+        "    ROW_NUMBER() OVER (PARTITION BY p.deviceid ORDER BY p.fixtime DESC) AS rn\n",
+        "  FROM\n",
+        "    uc.famous.tc_positions p\n",
+        "  WHERE\n",
+        "    p.latitude != 0\n",
+        "    AND p.longitude != 0\n",
+        ")\n",
+        "SELECT\n",
+        "  CAST(d.id AS STRING) AS unit_id,\n",
+        "  d.name AS no_lambung,\n",
+        "  SPLIT(d.name, ' ')[0] AS kontraktor,\n",
+        "  CASE\n",
+        "    WHEN\n",
+        "      UPPER(d.name) LIKE '% EV%'\n",
+        "      OR UPPER(d.category) = 'EXCAVATOR'\n",
+        "    THEN\n",
+        "      'EV'\n",
+        "    WHEN UPPER(d.name) LIKE '% DDT%' THEN 'DDT'\n",
+        "    WHEN UPPER(d.name) LIKE '% SDT%' THEN 'SDT'\n",
+        "    WHEN\n",
+        "      UPPER(d.name) LIKE '% DT%'\n",
+        "      OR UPPER(d.category) = 'TRUCK'\n",
+        "    THEN\n",
+        "      'DT'\n",
+        "    WHEN\n",
+        "      UPPER(d.name) LIKE '% LV%'\n",
+        "      OR UPPER(d.category) IN ('CAR', 'LIGHT_VEHICLE')\n",
+        "    THEN\n",
+        "      'LV'\n",
+        "    ELSE COALESCE(d.category, 'OTHER')\n",
+        "  END AS jenis_unit,\n",
+        "  lp.latitude,\n",
+        "  lp.longitude,\n",
+        "  ROUND(lp.speed * 1.852, 1) AS speed_kmh,\n",
+        "  lp.course AS heading,\n",
+        "  CASE\n",
+        "    WHEN d.status = 'offline' THEN 'MATI'\n",
+        "    WHEN\n",
+        "      d.motionstate = 0\n",
+        "      AND lp.geofenceids LIKE '%:true%'\n",
+        "    THEN\n",
+        "      'OUT_OF_HAULING'\n",
+        "    WHEN\n",
+        "      d.motionstate = 1\n",
+        "      AND lp.geofenceids LIKE '%:true%'\n",
+        "    THEN\n",
+        "      'MUATAN'\n",
+        "    WHEN d.motionstate = 1 THEN 'KOSONG'\n",
+        "    WHEN d.motionstate = 0 THEN 'MATI'\n",
+        "    ELSE 'KOSONG'\n",
+        "  END AS status_operasional,\n",
+        "  g.name AS zona_geofence,\n",
+        "  COALESCE(g.group_name, 'OUTSIDE') AS zona_type,\n",
+        "  lp.fixtime AS last_update,\n",
+        "  TIMESTAMPDIFF(SECOND, lp.fixtime, CURRENT_TIMESTAMP()) AS data_age_seconds\n",
+        "FROM\n",
+        "  latest_position lp\n",
+        "    JOIN uc.famous.master_tc_device d\n",
+        "      ON lp.deviceid = d.id\n",
+        "    LEFT JOIN uc.famous.tc_geofences g\n",
+        "      ON lp.geofenceids LIKE CONCAT('%\"in', CAST(g.id AS STRING), '\":true%')\n",
+        "WHERE\n",
+        "  lp.rn = 1"
+      ]
+    },
+    {
+      "name": "05_cp_exception_monitoring",
+      "displayName": "05 CP Exception Monitoring",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_exception_monitoring`"
+      ]
+    },
+    {
+      "name": "05_cp_lane_summary",
+      "displayName": "05 CP Lane Summary",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_lane_summary`"
+      ]
+    },
+    {
+      "name": "05_cp_hourly_summary",
+      "displayName": "05 CP Hourly Summary",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`"
+      ]
+    },
+    {
+      "name": "05_cp_daily_summary",
+      "displayName": "05 CP Daily Summary",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_daily_summary`"
+      ]
+    },
+    {
+      "name": "05_cp_realtime_monitoring",
+      "displayName": "05 CP Real-Time Monitoring",
+      "queryLines": [
+        "WITH latest_hourly AS (\n",
+        "  SELECT\n",
+        "    queue_name,\n",
+        "    transaction_date,\n",
+        "    transaction_hour,\n",
+        "    total_transaction,\n",
+        "    vehicle_in,\n",
+        "    vehicle_out,\n",
+        "    total_tonnage,\n",
+        "    avg_cp_area_duration_minutes,\n",
+        "    avg_queue_duration_minutes,\n",
+        "    ROW_NUMBER() OVER (\n",
+        "        PARTITION BY queue_name\n",
+        "        ORDER BY transaction_date DESC, transaction_hour DESC\n",
+        "      ) as rn\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        "),\n",
+        "cp_metrics AS (\n",
+        "  SELECT\n",
+        "    queue_name,\n",
+        "    vehicle_in - vehicle_out AS estimated_queue_length,\n",
+        "    vehicle_in - vehicle_out AS estimated_active_units,\n",
+        "    total_tonnage AS tph,\n",
+        "    100.0 AS installed_capacity_tph,\n",
+        "    (total_tonnage / 100.0) * 100 AS utilization_percentage,\n",
+        "    CASE\n",
+        "      WHEN (vehicle_in - vehicle_out) > 8 THEN 'ALERT'\n",
+        "      ELSE 'NORMAL'\n",
+        "    END AS alert_status,\n",
+        "    vehicle_in AS total_vehicle_in,\n",
+        "    vehicle_out AS total_vehicle_out,\n",
+        "    total_tonnage,\n",
+        "    avg_cp_area_duration_minutes,\n",
+        "    avg_queue_duration_minutes\n",
+        "  FROM\n",
+        "    latest_hourly\n",
+        "  WHERE\n",
+        "    rn = 1\n",
+        ")\n",
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  cp_metrics"
+      ]
+    },
+    {
+      "name": "05_cp_shift_comparison",
+      "displayName": "05 CP Shift Comparison",
+      "queryLines": [
+        "WITH shift_data AS (\n",
+        "  SELECT\n",
+        "    transaction_date,\n",
+        "    transaction_hour,\n",
+        "    queue_name,\n",
+        "    port,\n",
+        "    vehicle_in,\n",
+        "    vehicle_out,\n",
+        "    total_tonnage,\n",
+        "    avg_cp_area_duration_minutes,\n",
+        "    CASE\n",
+        "      WHEN\n",
+        "        transaction_hour >= 6\n",
+        "        AND transaction_hour < 18\n",
+        "      THEN\n",
+        "        'Day Shift'\n",
+        "      ELSE 'Night Shift'\n",
+        "    END AS shift_name,\n",
+        "    CASE\n",
+        "      WHEN transaction_hour < 6 THEN DATE_SUB(transaction_date, 1)\n",
+        "      ELSE transaction_date\n",
+        "    END AS shift_date\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        ")\n",
+        "SELECT\n",
+        "  shift_name,\n",
+        "  queue_name,\n",
+        "  SUM(vehicle_in) AS total_vehicle_in,\n",
+        "  SUM(vehicle_out) AS total_vehicle_out,\n",
+        "  SUM(total_tonnage) AS total_tonnage,\n",
+        "  AVG(total_tonnage) AS avg_tph,\n",
+        "  AVG(avg_cp_area_duration_minutes) AS avg_cp_area_duration_minutes\n",
+        "FROM\n",
+        "  shift_data\n",
+        "GROUP BY\n",
+        "  shift_name,\n",
+        "  queue_name"
+      ]
+    },
+    {
+      "name": "05_cp_day_comparison",
+      "displayName": "05 CP Day-over-Day Comparison",
+      "queryLines": [
+        "SELECT\n",
+        "  transaction_date,\n",
+        "  queue_name,\n",
+        "  SUM(total_vehicle_in) AS total_vehicle_in,\n",
+        "  SUM(total_vehicle_out) AS total_vehicle_out,\n",
+        "  SUM(total_tonnage) AS total_tonnage,\n",
+        "  SUM(total_tonnage) / 24.0 AS avg_tph,\n",
+        "  AVG(avg_cp_area_duration_minutes) AS avg_cp_area_duration_minutes\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_daily_summary`\n",
+        "GROUP BY\n",
+        "  transaction_date,\n",
+        "  queue_name\n",
+        "ORDER BY\n",
+        "  transaction_date DESC"
+      ]
+    },
+    {
+      "name": "05_cp_kpi_summary",
+      "displayName": "05 CP KPI Summary",
+      "queryLines": [
+        "WITH latest_data AS (\n",
+        "  SELECT\n",
+        "    COUNT(DISTINCT queue_name) AS total_cp_monitored,\n",
+        "    SUM(total_vehicle_in) AS total_vehicle_in,\n",
+        "    SUM(total_vehicle_out) AS total_vehicle_out,\n",
+        "    SUM(total_transaction) AS total_transaction,\n",
+        "    SUM(total_tonnage) AS total_tonnage,\n",
+        "    AVG(avg_cp_area_duration_minutes) AS avg_cp_area_duration,\n",
+        "    SUM(anomaly_count) AS anomaly_count,\n",
+        "    SUM(data_quality_issue_count) AS data_quality_issue_count\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_daily_summary`\n",
+        "),\n",
+        "queue_metrics AS (\n",
+        "  SELECT\n",
+        "    SUM(vehicle_in - vehicle_out) AS total_queue_length,\n",
+        "    SUM(vehicle_in - vehicle_out) AS total_active_units,\n",
+        "    SUM(\n",
+        "      CASE\n",
+        "        WHEN (vehicle_in - vehicle_out) > 8 THEN 1\n",
+        "        ELSE 0\n",
+        "      END\n",
+        "    ) AS alert_count,\n",
+        "    AVG(total_tonnage) AS avg_tph\n",
+        "  FROM\n",
+        "    (\n",
+        "      SELECT\n",
+        "        queue_name,\n",
+        "        vehicle_in,\n",
+        "        vehicle_out,\n",
+        "        total_tonnage,\n",
+        "        ROW_NUMBER() OVER (\n",
+        "            PARTITION BY queue_name\n",
+        "            ORDER BY transaction_date DESC, transaction_hour DESC\n",
+        "          ) as rn\n",
+        "      FROM\n",
+        "        `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        "    )\n",
+        "  WHERE\n",
+        "    rn = 1\n",
+        ")\n",
+        "SELECT\n",
+        "  ld.total_cp_monitored,\n",
+        "  COALESCE(qm.total_queue_length, 0) AS total_queue_length,\n",
+        "  COALESCE(qm.total_active_units, 0) AS total_active_units,\n",
+        "  COALESCE(qm.avg_tph, 0) AS avg_tph,\n",
+        "  ld.total_tonnage,\n",
+        "  ld.total_vehicle_in,\n",
+        "  ld.total_vehicle_out,\n",
+        "  ld.avg_cp_area_duration,\n",
+        "  COALESCE(qm.alert_count, 0) AS alert_count,\n",
+        "  ld.data_quality_issue_count\n",
+        "FROM\n",
+        "  latest_data ld CROSS JOIN queue_metrics qm"
+      ]
+    },
+    {
+      "name": "05_ds_left_cp_performance",
+      "displayName": "05 LEFT Period - CP Performance",
+      "queryLines": [
+        "SELECT\n",
+        "  queue_name,\n",
+        "  SUM(total_vehicle_in) AS vehicle_in,\n",
+        "  SUM(total_vehicle_out) AS vehicle_out,\n",
+        "  SUM(total_tonnage) AS total_tonnage,\n",
+        "  SUM(total_tonnage) / NULLIF(SUM(total_vehicle_in), 0) AS tph,\n",
+        "  AVG(avg_cp_area_duration_minutes) AS avg_cp_area_duration_minutes\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_daily_summary`\n",
+        "WHERE\n",
+        "  transaction_date >= :left_start_ts\n",
+        "  AND transaction_date <= :left_end_ts\n",
+        "GROUP BY\n",
+        "  queue_name"
+      ],
+      "parameters": [
+        {
+          "displayName": "Left Start",
+          "keyword": "left_start_ts",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-01"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Left End",
+          "keyword": "left_end_ts",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-07"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05_ds_comparison_delta_by_cp",
+      "displayName": "05 Delta Comparison by CP",
+      "queryLines": [
+        "WITH left_period AS (\n",
+        "  SELECT\n",
+        "    queue_name,\n",
+        "    SUM(total_vehicle_in) AS vehicle_in,\n",
+        "    SUM(total_tonnage) AS total_tonnage,\n",
+        "    SUM(total_tonnage) / NULLIF(SUM(total_vehicle_in), 0) AS tph\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_daily_summary`\n",
+        "  WHERE\n",
+        "    transaction_date >= :left_start_ts\n",
+        "    AND transaction_date <= :left_end_ts\n",
+        "  GROUP BY\n",
+        "    queue_name\n",
+        "),\n",
+        "right_period AS (\n",
+        "  SELECT\n",
+        "    queue_name,\n",
+        "    SUM(total_vehicle_in) AS vehicle_in,\n",
+        "    SUM(total_tonnage) AS total_tonnage,\n",
+        "    SUM(total_tonnage) / NULLIF(SUM(total_vehicle_in), 0) AS tph\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_daily_summary`\n",
+        "  WHERE\n",
+        "    transaction_date >= :right_start_ts\n",
+        "    AND transaction_date <= :right_end_ts\n",
+        "  GROUP BY\n",
+        "    queue_name\n",
+        ")\n",
+        "SELECT\n",
+        "  COALESCE(l.queue_name, r.queue_name) AS queue_name,\n",
+        "  COALESCE(l.vehicle_in, 0) AS left_vehicle_in,\n",
+        "  COALESCE(r.vehicle_in, 0) AS right_vehicle_in,\n",
+        "  COALESCE(r.vehicle_in, 0) - COALESCE(l.vehicle_in, 0) AS delta_vehicle_in,\n",
+        "  ROUND(\n",
+        "    (COALESCE(r.vehicle_in, 0) - COALESCE(l.vehicle_in, 0)) * 100.0 / NULLIF(l.vehicle_in, 0),\n",
+        "    1\n",
+        "  ) AS delta_vehicle_in_pct,\n",
+        "  COALESCE(l.total_tonnage, 0) AS left_total_tonnage,\n",
+        "  COALESCE(r.total_tonnage, 0) AS right_total_tonnage,\n",
+        "  COALESCE(r.total_tonnage, 0) - COALESCE(l.total_tonnage, 0) AS delta_total_tonnage,\n",
+        "  ROUND(\n",
+        "    (COALESCE(r.total_tonnage, 0) - COALESCE(l.total_tonnage, 0))\n",
+        "      * 100.0\n",
+        "      / NULLIF(l.total_tonnage, 0),\n",
+        "    1\n",
+        "  ) AS delta_total_tonnage_pct,\n",
+        "  COALESCE(l.tph, 0) AS left_tph,\n",
+        "  COALESCE(r.tph, 0) AS right_tph,\n",
+        "  COALESCE(r.tph, 0) - COALESCE(l.tph, 0) AS delta_tph,\n",
+        "  ROUND((COALESCE(r.tph, 0) - COALESCE(l.tph, 0)) * 100.0 / NULLIF(l.tph, 0), 1) AS delta_tph_pct\n",
+        "FROM\n",
+        "  left_period l\n",
+        "    FULL OUTER JOIN right_period r\n",
+        "      ON l.queue_name = r.queue_name"
+      ],
+      "parameters": [
+        {
+          "displayName": "Left Start",
+          "keyword": "left_start_ts",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-01"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Left End",
+          "keyword": "left_end_ts",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-07"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Right Start",
+          "keyword": "right_start_ts",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-08"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Right End",
+          "keyword": "right_end_ts",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-14"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05_ds_right_cp_performance",
+      "displayName": "05 RIGHT Period - CP Performance",
+      "queryLines": [
+        "SELECT\n",
+        "  queue_name,\n",
+        "  SUM(total_vehicle_in) AS vehicle_in,\n",
+        "  SUM(total_vehicle_out) AS vehicle_out,\n",
+        "  SUM(total_tonnage) AS total_tonnage,\n",
+        "  SUM(total_tonnage) / NULLIF(SUM(total_vehicle_in), 0) AS tph,\n",
+        "  AVG(avg_cp_area_duration_minutes) AS avg_cp_area_duration_minutes\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_daily_summary`\n",
+        "WHERE\n",
+        "  transaction_date >= :right_start_ts\n",
+        "  AND transaction_date <= :right_end_ts\n",
+        "GROUP BY\n",
+        "  queue_name"
+      ],
+      "parameters": [
+        {
+          "displayName": "Right Start",
+          "keyword": "right_start_ts",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-08"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Right End",
+          "keyword": "right_end_ts",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-14"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05_ds_left_hourly_trend",
+      "displayName": "05 LEFT Period - Hourly Trend",
+      "queryLines": [
+        "SELECT\n",
+        "  transaction_hour,\n",
+        "  SUM(vehicle_in) AS vehicle_in,\n",
+        "  SUM(total_tonnage) AS total_tonnage\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        "WHERE\n",
+        "  transaction_date >= :left_start_ts\n",
+        "  AND transaction_date <= :left_end_ts\n",
+        "GROUP BY\n",
+        "  transaction_hour\n",
+        "ORDER BY\n",
+        "  transaction_hour"
+      ],
+      "parameters": [
+        {
+          "displayName": "Left Start",
+          "keyword": "left_start_ts",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-01"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Left End",
+          "keyword": "left_end_ts",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-07"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05_ds_right_hourly_trend",
+      "displayName": "05 RIGHT Period - Hourly Trend",
+      "queryLines": [
+        "SELECT\n",
+        "  transaction_hour,\n",
+        "  SUM(vehicle_in) AS vehicle_in,\n",
+        "  SUM(total_tonnage) AS total_tonnage\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        "WHERE\n",
+        "  transaction_date >= :right_start_ts\n",
+        "  AND transaction_date <= :right_end_ts\n",
+        "GROUP BY\n",
+        "  transaction_hour\n",
+        "ORDER BY\n",
+        "  transaction_hour"
+      ],
+      "parameters": [
+        {
+          "displayName": "Right Start",
+          "keyword": "right_start_ts",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-08"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Right End",
+          "keyword": "right_end_ts",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2026-07-14"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "c33c7e14",
+      "displayName": "UC01",
+      "layout": [
+        {
+          "widget": {
+            "name": "01_filter_week",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e7b28dd1336ac4b619de8948f0e_week_of_year",
+                "query": {
+                  "datasetName": "01_filter_week",
+                  "fields": [
+                    {
+                      "name": "week_of_year",
+                      "expression": "`week_of_year`"
+                    },
+                    {
+                      "name": "week_of_year_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Week Selector",
+                "showTitle": true
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "week_of_year",
+                    "queryName": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e7b28dd1336ac4b619de8948f0e_week_of_year"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "01_filter_hari",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e7b373b152390e9610d1246f044_Hari",
+                "query": {
+                  "datasetName": "01_filter_hari",
+                  "fields": [
+                    {
+                      "name": "Hari",
+                      "expression": "`Hari`"
+                    },
+                    {
+                      "name": "Hari_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Filter Hari",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "Hari",
+                    "queryName": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e7b373b152390e9610d1246f044_Hari"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "01_dangerous_km_bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "01_top5_dangerous_km",
+                  "fields": [
+                    {
+                      "name": "avg_ttc",
+                      "expression": "`avg_ttc`"
+                    },
+                    {
+                      "name": "lokasi_km",
+                      "expression": "`lokasi_km`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Top 5 lokasi jarak aman paling jelek (kecil)",
+                "showTitle": true
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#DC3545"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "avg_ttc",
+                  "displayName": " ",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "lokasi_km",
+                  "displayName": "Lokasi KM",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x"
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "01_safest_km_bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "01_top5_safest_km",
+                  "fields": [
+                    {
+                      "name": "avg_ttc",
+                      "expression": "`avg_ttc`"
+                    },
+                    {
+                      "name": "lokasi_km",
+                      "expression": "`lokasi_km`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Top 5 lokasi jarak aman paling baik (besar)",
+                "showTitle": true
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#28A745"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "avg_ttc",
+                  "displayName": " ",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "lokasi_km",
+                  "displayName": "Lokasi KM",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "01_worst_hours_bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "01_top5_worst_hours",
+                  "fields": [
+                    {
+                      "name": "avg_ttc",
+                      "expression": "`avg_ttc`"
+                    },
+                    {
+                      "name": "range_waktu",
+                      "expression": "`range_waktu`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Top 5 waktu jarak aman paling jelek",
+                "showTitle": true
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#DC3545"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "avg_ttc",
+                  "displayName": " ",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "range_waktu",
+                  "displayName": "Range Waktu",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x"
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "01_best_hours_bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "01_top5_best_hours",
+                  "fields": [
+                    {
+                      "name": "avg_ttc",
+                      "expression": "`avg_ttc`"
+                    },
+                    {
+                      "name": "range_waktu",
+                      "expression": "`range_waktu`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Top 5 waktu jarak aman paling baik",
+                "showTitle": true
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#28A745"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "avg_ttc",
+                  "displayName": " ",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "range_waktu",
+                  "displayName": "Range Waktu",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x"
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 2,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "01_heatmap_waktu_s",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "01_heatmap_interval_hari",
+                  "fields": [
+                    {
+                      "name": "jarak_s",
+                      "expression": "`jarak_s`"
+                    },
+                    {
+                      "name": "Hari",
+                      "expression": "`Hari`"
+                    },
+                    {
+                      "name": "Interval",
+                      "expression": "`Interval`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Waktu (s)",
+                "showTitle": true
+              },
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "Hari",
+                  "displayName": "Hari",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "custom-order",
+                      "orderedValues": [
+                        "Senin",
+                        "Selasa",
+                        "Rabu",
+                        "Kamis",
+                        "Jumat",
+                        "Sabtu",
+                        "Minggu"
+                      ]
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "Interval",
+                  "displayName": "Interval",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "natural-order"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "jarak_s",
+                  "displayName": "Jarak (s)",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "plasma"
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 3,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "01_heatmap_grup_truk",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "01_heatmap_grup_truk",
+                  "fields": [
+                    {
+                      "name": "jarak_s",
+                      "expression": "`jarak_s`"
+                    },
+                    {
+                      "name": "Hari",
+                      "expression": "`Hari`"
+                    },
+                    {
+                      "name": "group_truk",
+                      "expression": "`group_truk`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Grup Truk (s)",
+                "showTitle": true
+              },
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "Hari",
+                  "displayName": "Hari",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "custom-order",
+                      "orderedValues": [
+                        "Senin",
+                        "Selasa",
+                        "Rabu",
+                        "Kamis",
+                        "Jumat",
+                        "Sabtu",
+                        "Minggu"
+                      ]
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "group_truk",
+                  "displayName": "Group Truk",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "natural-order"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "jarak_s",
+                  "displayName": "Jarak (s)",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "plasma"
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 8,
+            "width": 3,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "01_heatmap_jarak_m",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "01_heatmap_jarak_m",
+                  "fields": [
+                    {
+                      "name": "jarak_m",
+                      "expression": "`jarak_m`"
+                    },
+                    {
+                      "name": "Hari",
+                      "expression": "`Hari`"
+                    },
+                    {
+                      "name": "Interval",
+                      "expression": "`Interval`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Jarak (m)",
+                "showTitle": true
+              },
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "Hari",
+                  "displayName": "Hari",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "custom-order",
+                      "orderedValues": [
+                        "Senin",
+                        "Selasa",
+                        "Rabu",
+                        "Kamis",
+                        "Jumat",
+                        "Sabtu",
+                        "Minggu"
+                      ]
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "Interval",
+                  "displayName": "Interval",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "natural-order"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "jarak_m",
+                  "displayName": "Jarak (m)",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "plasma"
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 8,
+            "width": 3,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "01_heatmap_km_s",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "01_heatmap_km_s",
+                  "fields": [
+                    {
+                      "name": "jarak_s",
+                      "expression": "`jarak_s`"
+                    },
+                    {
+                      "name": "Hari",
+                      "expression": "`Hari`"
+                    },
+                    {
+                      "name": "KM",
+                      "expression": "`KM`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Geofence KM (s)",
+                "showTitle": true
+              },
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "Hari",
+                  "displayName": "Hari",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "custom-order",
+                      "orderedValues": [
+                        "Senin",
+                        "Selasa",
+                        "Rabu",
+                        "Kamis",
+                        "Jumat",
+                        "Sabtu",
+                        "Minggu"
+                      ]
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "KM",
+                  "displayName": "KM",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "natural-order"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "jarak_s",
+                  "displayName": "Jarak (s)",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "plasma"
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 8,
+            "width": 3,
+            "height": 7
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "uc02_prototype",
+      "displayName": "UC02 Prototype",
+      "layout": [
+        {
+          "widget": {
+            "name": "02_filter_kontraktor",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e7bf4a01f01a22f1dc894969fae_kontraktor",
+                "query": {
+                  "datasetName": "02_sebaran_unit",
+                  "fields": [
+                    {
+                      "name": "kontraktor",
+                      "expression": "`kontraktor`"
+                    },
+                    {
+                      "name": "kontraktor_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Kontraktor",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "kontraktor",
+                    "queryName": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e7bf4a01f01a22f1dc894969fae_kontraktor"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "02_filter_jenis_unit",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e7bf4a01f01a22f1dc894969fae_jenis_unit",
+                "query": {
+                  "datasetName": "02_sebaran_unit",
+                  "fields": [
+                    {
+                      "name": "jenis_unit",
+                      "expression": "`jenis_unit`"
+                    },
+                    {
+                      "name": "jenis_unit_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Jenis Unit",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "jenis_unit",
+                    "queryName": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e7bf4a01f01a22f1dc894969fae_jenis_unit"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "02_filter_status",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e7bf4a01f01a22f1dc894969fae_status_operasional",
+                "query": {
+                  "datasetName": "02_sebaran_unit",
+                  "fields": [
+                    {
+                      "name": "status_operasional",
+                      "expression": "`status_operasional`"
+                    },
+                    {
+                      "name": "status_operasional_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Status Operasional",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "status_operasional",
+                    "queryName": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e7bf4a01f01a22f1dc894969fae_status_operasional"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "02_filter_zona",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e7bf4a01f01a22f1dc894969fae_zona_geofence",
+                "query": {
+                  "datasetName": "02_sebaran_unit",
+                  "fields": [
+                    {
+                      "name": "zona_geofence",
+                      "expression": "`zona_geofence`"
+                    },
+                    {
+                      "name": "zona_geofence_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Zona Geofence",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "zona_geofence",
+                    "queryName": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e7bf4a01f01a22f1dc894969fae_zona_geofence"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "02_symbol_map",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "02_sebaran_unit",
+                  "fields": [
+                    {
+                      "name": "status_operasional",
+                      "expression": "`status_operasional`"
+                    },
+                    {
+                      "name": "latitude",
+                      "expression": "`latitude`"
+                    },
+                    {
+                      "name": "longitude",
+                      "expression": "`longitude`"
+                    },
+                    {
+                      "name": "no_lambung",
+                      "expression": "`no_lambung`"
+                    },
+                    {
+                      "name": "kontraktor",
+                      "expression": "`kontraktor`"
+                    },
+                    {
+                      "name": "speed_kmh",
+                      "expression": "`speed_kmh`"
+                    },
+                    {
+                      "name": "zona_geofence",
+                      "expression": "`zona_geofence`"
+                    },
+                    {
+                      "name": "jenis_unit",
+                      "expression": "`jenis_unit`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Peta Sebaran Unit",
+                "showTitle": true
+              },
+              "widgetType": "symbol-map",
+              "encodings": {
+                "coordinates": {
+                  "coordinateType": "longitude-latitude",
+                  "latitude": {
+                    "fieldName": "latitude"
+                  },
+                  "longitude": {
+                    "fieldName": "longitude"
+                  }
+                },
+                "color": {
+                  "fieldName": "status_operasional",
+                  "displayName": "Status",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "MUATAN",
+                        "color": "#28A745"
+                      },
+                      {
+                        "value": "KOSONG",
+                        "color": "#FFA500"
+                      },
+                      {
+                        "value": "MATI",
+                        "color": "#DC3545"
+                      },
+                      {
+                        "value": "OUT_OF_HAULING",
+                        "color": "#343A40"
+                      }
+                    ]
+                  }
+                },
+                "shape": {
+                  "fieldName": "jenis_unit",
+                  "displayName": "Jenis Unit",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "EV",
+                        "shape": "diamond"
+                      },
+                      {
+                        "value": "DT",
+                        "shape": "circle"
+                      },
+                      {
+                        "value": "DDT",
+                        "shape": "square"
+                      },
+                      {
+                        "value": "SDT",
+                        "shape": "triangle-up"
+                      },
+                      {
+                        "value": "LV",
+                        "shape": "star"
+                      }
+                    ]
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "no_lambung",
+                    "displayName": "No Lambung"
+                  },
+                  {
+                    "fieldName": "kontraktor",
+                    "displayName": "Kontraktor"
+                  },
+                  {
+                    "fieldName": "speed_kmh",
+                    "displayName": "Kecepatan (km/h)"
+                  },
+                  {
+                    "fieldName": "zona_geofence",
+                    "displayName": "Zona"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 12,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "02_counter_muatan",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "02_sebaran_unit",
+                  "fields": [
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`status_operasional` IN ('MUATAN')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Unit Muatan",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(*)",
+                  "style": {
+                    "color": "#28A745",
+                    "bold": true
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "02_counter_kosong",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "02_sebaran_unit",
+                  "fields": [
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`status_operasional` IN ('KOSONG')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Unit Kosong",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(*)",
+                  "style": {
+                    "color": "#FFA500",
+                    "bold": true
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 12,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "02_counter_mati",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "02_sebaran_unit",
+                  "fields": [
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`status_operasional` IN ('MATI')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Unit Mati",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(*)",
+                  "style": {
+                    "color": "#DC3545",
+                    "bold": true
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 12,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "02_counter_ooh",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "02_sebaran_unit",
+                  "fields": [
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`status_operasional` IN ('OUT_OF_HAULING')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Unit Out of Hauling",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(*)",
+                  "style": {
+                    "color": "#343A40",
+                    "bold": true
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 12,
+            "width": 3,
+            "height": 3
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "92cbf67e",
+      "displayName": "UC03 Tonase Per Kontraktor per ROM",
+      "layout": [
+        {
+          "widget": {
+            "name": "filter_date_from",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f17da6c0df1510bf32cf97f670081d_date_from",
+                "query": {
+                  "datasetName": "rom_tonase_by_kontraktor",
+                  "parameters": [
+                    {
+                      "name": "date_from",
+                      "keyword": "date_from"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f186312d2413b593a41c6d17d7b7e3_date_from",
+                "query": {
+                  "datasetName": "heatmap_hourly_singleday",
+                  "parameters": [
+                    {
+                      "name": "date_from",
+                      "keyword": "date_from"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f186312e541fc79f6766c0584061a9_date_from",
+                "query": {
+                  "datasetName": "heatmap_daily_multiday",
+                  "parameters": [
+                    {
+                      "name": "date_from",
+                      "keyword": "date_from"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Tanggal Dari",
+                "showTitle": true
+              },
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "date_from",
+                    "queryName": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f17da6c0df1510bf32cf97f670081d_date_from"
+                  },
+                  {
+                    "parameterName": "date_from",
+                    "queryName": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f186312d2413b593a41c6d17d7b7e3_date_from"
+                  },
+                  {
+                    "parameterName": "date_from",
+                    "queryName": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f186312e541fc79f6766c0584061a9_date_from"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_date_to",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71dfb8276096c78ccad6e_date_to",
+                "query": {
+                  "datasetName": "rom_tonase_by_kontraktor",
+                  "parameters": [
+                    {
+                      "name": "date_to",
+                      "keyword": "date_to"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e258831eefc04aaae68_date_to",
+                "query": {
+                  "datasetName": "heatmap_hourly_singleday",
+                  "parameters": [
+                    {
+                      "name": "date_to",
+                      "keyword": "date_to"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e2abb7c119e79095bc7_date_to",
+                "query": {
+                  "datasetName": "heatmap_daily_multiday",
+                  "parameters": [
+                    {
+                      "name": "date_to",
+                      "keyword": "date_to"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Tanggal Sampai",
+                "showTitle": true
+              },
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "date_to",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71dfb8276096c78ccad6e_date_to"
+                  },
+                  {
+                    "parameterName": "date_to",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e258831eefc04aaae68_date_to"
+                  },
+                  {
+                    "parameterName": "date_to",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e2abb7c119e79095bc7_date_to"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_shift",
+            "queries": [
+              {
+                "name": "dashboards/01f17da560191a879136904ac0f82869/datasets/01f17dd7f2af119c9efe1dba3a3c48c0_shift_value",
+                "query": {
+                  "datasetName": "shift_options",
+                  "fields": [
+                    {
+                      "name": "shift_value",
+                      "expression": "`shift_value`"
+                    },
+                    {
+                      "name": "shift_value_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f17da6c0df1510bf32cf97f670081d_shift_from",
+                "query": {
+                  "datasetName": "rom_tonase_by_kontraktor",
+                  "parameters": [
+                    {
+                      "name": "shift_from",
+                      "keyword": "shift_from"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f186312d2413b593a41c6d17d7b7e3_shift_from",
+                "query": {
+                  "datasetName": "heatmap_hourly_singleday",
+                  "parameters": [
+                    {
+                      "name": "shift_from",
+                      "keyword": "shift_from"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f186312e541fc79f6766c0584061a9_shift_from",
+                "query": {
+                  "datasetName": "heatmap_daily_multiday",
+                  "parameters": [
+                    {
+                      "name": "shift_from",
+                      "keyword": "shift_from"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Shift Dari",
+                "showTitle": true
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "shift_value",
+                    "queryName": "dashboards/01f17da560191a879136904ac0f82869/datasets/01f17dd7f2af119c9efe1dba3a3c48c0_shift_value"
+                  },
+                  {
+                    "parameterName": "shift_from",
+                    "queryName": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f17da6c0df1510bf32cf97f670081d_shift_from"
+                  },
+                  {
+                    "parameterName": "shift_from",
+                    "queryName": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f186312d2413b593a41c6d17d7b7e3_shift_from"
+                  },
+                  {
+                    "parameterName": "shift_from",
+                    "queryName": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f186312e541fc79f6766c0584061a9_shift_from"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_hour",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e1999580e302df1fe9a_hour_value",
+                "query": {
+                  "datasetName": "hour_options",
+                  "fields": [
+                    {
+                      "name": "hour_value",
+                      "expression": "`hour_value`"
+                    },
+                    {
+                      "name": "hour_value_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71dfb8276096c78ccad6e_hour_from",
+                "query": {
+                  "datasetName": "rom_tonase_by_kontraktor",
+                  "parameters": [
+                    {
+                      "name": "hour_from",
+                      "keyword": "hour_from"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e258831eefc04aaae68_hour_from",
+                "query": {
+                  "datasetName": "heatmap_hourly_singleday",
+                  "parameters": [
+                    {
+                      "name": "hour_from",
+                      "keyword": "hour_from"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e2abb7c119e79095bc7_hour_from",
+                "query": {
+                  "datasetName": "heatmap_daily_multiday",
+                  "parameters": [
+                    {
+                      "name": "hour_from",
+                      "keyword": "hour_from"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Jam Dari",
+                "showTitle": true
+              },
+              "scale": {
+                "type": "categorical",
+                "sort": {
+                  "by": "custom-order",
+                  "orderedValues": [
+                    "ALL",
+                    "0",
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11",
+                    "12",
+                    "13",
+                    "14",
+                    "15",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20",
+                    "21",
+                    "22",
+                    "23"
+                  ]
+                }
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "hour_value",
+                    "queryName": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e1999580e302df1fe9a_hour_value"
+                  },
+                  {
+                    "parameterName": "hour_from",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71dfb8276096c78ccad6e_hour_from"
+                  },
+                  {
+                    "parameterName": "hour_from",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e258831eefc04aaae68_hour_from"
+                  },
+                  {
+                    "parameterName": "hour_from",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e2abb7c119e79095bc7_hour_from"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_chart_tonase",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "rom_tonase_by_kontraktor",
+                  "fields": [
+                    {
+                      "name": "kontraktor",
+                      "expression": "`kontraktor`"
+                    },
+                    {
+                      "name": "master_location",
+                      "expression": "`master_location`"
+                    },
+                    {
+                      "name": "sum(tonase)",
+                      "expression": "SUM(`tonase`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Total Tonase per Kontraktor per ROM",
+                "showTitle": true
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "master_location",
+                  "displayName": "ROM",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(tonase)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "kontraktor",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 5,
+            "width": 6,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_shift_to",
+            "queries": [
+              {
+                "name": "dashboards/01f17da560191a879136904ac0f82869/datasets/01f17dd7f2af119c9efe1dba3a3c48c0_shift_value",
+                "query": {
+                  "datasetName": "shift_options",
+                  "fields": [
+                    {
+                      "name": "shift_value",
+                      "expression": "`shift_value`"
+                    },
+                    {
+                      "name": "shift_value_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f17da6c0df1510bf32cf97f670081d_shift_to",
+                "query": {
+                  "datasetName": "rom_tonase_by_kontraktor",
+                  "parameters": [
+                    {
+                      "name": "shift_to",
+                      "keyword": "shift_to"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f186312d2413b593a41c6d17d7b7e3_shift_to",
+                "query": {
+                  "datasetName": "heatmap_hourly_singleday",
+                  "parameters": [
+                    {
+                      "name": "shift_to",
+                      "keyword": "shift_to"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f186312e541fc79f6766c0584061a9_shift_to",
+                "query": {
+                  "datasetName": "heatmap_daily_multiday",
+                  "parameters": [
+                    {
+                      "name": "shift_to",
+                      "keyword": "shift_to"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Shift Sampai",
+                "showTitle": true
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "shift_value",
+                    "queryName": "dashboards/01f17da560191a879136904ac0f82869/datasets/01f17dd7f2af119c9efe1dba3a3c48c0_shift_value"
+                  },
+                  {
+                    "parameterName": "shift_to",
+                    "queryName": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f17da6c0df1510bf32cf97f670081d_shift_to"
+                  },
+                  {
+                    "parameterName": "shift_to",
+                    "queryName": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f186312d2413b593a41c6d17d7b7e3_shift_to"
+                  },
+                  {
+                    "parameterName": "shift_to",
+                    "queryName": "parameter_dashboards/01f17da560191a879136904ac0f82869/datasets/01f186312e541fc79f6766c0584061a9_shift_to"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_hour_to",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e1999580e302df1fe9a_hour_value",
+                "query": {
+                  "datasetName": "hour_options",
+                  "fields": [
+                    {
+                      "name": "hour_value",
+                      "expression": "`hour_value`"
+                    },
+                    {
+                      "name": "hour_value_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71dfb8276096c78ccad6e_hour_to",
+                "query": {
+                  "datasetName": "rom_tonase_by_kontraktor",
+                  "parameters": [
+                    {
+                      "name": "hour_to",
+                      "keyword": "hour_to"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e258831eefc04aaae68_hour_to",
+                "query": {
+                  "datasetName": "heatmap_hourly_singleday",
+                  "parameters": [
+                    {
+                      "name": "hour_to",
+                      "keyword": "hour_to"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e2abb7c119e79095bc7_hour_to",
+                "query": {
+                  "datasetName": "heatmap_daily_multiday",
+                  "parameters": [
+                    {
+                      "name": "hour_to",
+                      "keyword": "hour_to"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Jam Sampai",
+                "showTitle": true
+              },
+              "scale": {
+                "type": "categorical",
+                "sort": {
+                  "by": "custom-order",
+                  "orderedValues": [
+                    "ALL",
+                    "0",
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11",
+                    "12",
+                    "13",
+                    "14",
+                    "15",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20",
+                    "21",
+                    "22",
+                    "23"
+                  ]
+                }
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "hour_value",
+                    "queryName": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e1999580e302df1fe9a_hour_value"
+                  },
+                  {
+                    "parameterName": "hour_to",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71dfb8276096c78ccad6e_hour_to"
+                  },
+                  {
+                    "parameterName": "hour_to",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e258831eefc04aaae68_hour_to"
+                  },
+                  {
+                    "parameterName": "hour_to",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e2b9cc71e2abb7c119e79095bc7_hour_to"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "heatmap_waktu_sibuk",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "heatmap_hourly_singleday",
+                  "fields": [
+                    {
+                      "name": "sum_jumlah_unit_aktif",
+                      "expression": "`sum_jumlah_unit_aktif`"
+                    },
+                    {
+                      "name": "rdate",
+                      "expression": "`rdate`"
+                    },
+                    {
+                      "name": "master_location",
+                      "expression": "`master_location`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Heatmap Waktu Sibuk per ROM",
+                "showTitle": true
+              },
+              "version": 3,
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "rdate",
+                  "displayName": "Jam",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "master_location",
+                  "displayName": "ROM",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "sum_jumlah_unit_aktif",
+                  "displayName": "Total Unit Aktif",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "orangered"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 15,
+            "width": 12,
+            "height": 12
+          }
+        },
+        {
+          "widget": {
+            "name": "heatmap_per_tanggal",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "heatmap_daily_multiday",
+                  "fields": [
+                    {
+                      "name": "sum_jumlah_unit_aktif",
+                      "expression": "`sum_jumlah_unit_aktif`"
+                    },
+                    {
+                      "name": "op_date",
+                      "expression": "`op_date`"
+                    },
+                    {
+                      "name": "master_location",
+                      "expression": "`master_location`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Heatmap Aktivitas per Tanggal per ROM",
+                "showTitle": true
+              },
+              "version": 3,
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "op_date",
+                  "displayName": "Tanggal",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "master_location",
+                  "displayName": "ROM",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "sum_jumlah_unit_aktif",
+                  "displayName": "Total Unit Aktif",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "orangered"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 27,
+            "width": 12,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_transaksi",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "rom_tonase_by_kontraktor",
+                  "fields": [
+                    {
+                      "name": "sum(jumlah_transaksi)",
+                      "expression": "SUM(`jumlah_transaksi`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Jumlah Transaksi",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(jumlah_transaksi)",
+                  "rowNumber": 0,
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_tonase",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "rom_tonase_by_kontraktor",
+                  "fields": [
+                    {
+                      "name": "measure(Total Tonase per Kontraktor)",
+                      "expression": "MEASURE(`Total Tonase per Kontraktor`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Tonase",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(Total Tonase per Kontraktor)",
+                  "rowNumber": 0,
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_unit_aktif",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "rom_tonase_by_kontraktor",
+                  "fields": [
+                    {
+                      "name": "sum(jumlah_unit_aktif)",
+                      "expression": "SUM(`jumlah_unit_aktif`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Jumlah Unit Aktif",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(jumlah_unit_aktif)",
+                  "rowNumber": 0,
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_kontraktor_tonase_h",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "rom_tonase_by_kontraktor",
+                  "fields": [
+                    {
+                      "name": "measure(Total Tonase per Kontraktor)",
+                      "expression": "MEASURE(`Total Tonase per Kontraktor`)"
+                    },
+                    {
+                      "name": "kontraktor",
+                      "expression": "`kontraktor`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Total Tonase per Kontraktor",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(Total Tonase per Kontraktor)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Total Tonase",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "kontraktor",
+                  "displayName": "Kontraktor",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x"
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 6,
+            "height": 10
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "uc04_north_stockpile",
+      "displayName": "UC04 North Stockpile",
+      "layout": [
+        {
+          "widget": {
+            "name": "filter_date",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e78bf3d17c18890789873d54340_op_date",
+                "query": {
+                  "datasetName": "uc04_stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "op_date",
+                      "expression": "`op_date`"
+                    },
+                    {
+                      "name": "op_date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Filter Tanggal",
+                "showTitle": true
+              },
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "op_date",
+                    "queryName": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e78bf3d17c18890789873d54340_op_date"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_shift",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e78bf3d17c18890789873d54340_shift",
+                "query": {
+                  "datasetName": "uc04_stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "shift",
+                      "expression": "`shift`"
+                    },
+                    {
+                      "name": "shift_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Filter Shift",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "shift",
+                    "queryName": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e78bf3d17c18890789873d54340_shift"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_hour",
+            "queries": [
+              {
+                "name": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e78bf3d17c18890789873d54340_hour",
+                "query": {
+                  "datasetName": "uc04_stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "hour",
+                      "expression": "`hour`"
+                    },
+                    {
+                      "name": "hour_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Filter Hour",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "hour",
+                    "queryName": "dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e78bf3d17c18890789873d54340_hour"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_tonase",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "uc04_stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "shift",
+                      "expression": "`shift`"
+                    },
+                    {
+                      "name": "op_date",
+                      "expression": "`op_date`"
+                    },
+                    {
+                      "name": "sum(tonase_inbound)",
+                      "expression": "SUM(`tonase_inbound`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Tonase Inbound",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "op_date",
+                  "displayName": "tgl",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(tonase_inbound)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Tonase",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "shift",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "DS",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 1
+                        }
+                      },
+                      {
+                        "value": "NS",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 2
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "combo_inbound",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "uc04_stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "jumlah_inbound",
+                      "expression": "SUM(`jumlah_inbound`)"
+                    },
+                    {
+                      "name": "tonase_inbound",
+                      "expression": "SUM(`tonase_inbound`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "frame": {
+                "title": "Inbound",
+                "showTitle": true
+              },
+              "jsonSpec": {
+                "type": "vega-lite",
+                "spec": "{\"$schema\":\"https://vega.github.io/schema/vega-lite/v5.json\",\"data\":{\"name\":\"databricks_query\"},\"background\":\"transparent\",\"vconcat\":[{\"width\":\"container\",\"height\":80,\"layer\":[{\"mark\":{\"type\":\"text\",\"align\":\"center\",\"baseline\":\"middle\",\"dy\":-16,\"fontSize\":13,\"color\":\"#888888\"},\"encoding\":{\"text\":{\"value\":\"Jumlah Inbound\"}}},{\"mark\":{\"type\":\"text\",\"align\":\"center\",\"baseline\":\"middle\",\"dy\":14,\"fontSize\":32,\"fontWeight\":\"bold\",\"color\":\"#2E86AB\"},\"encoding\":{\"text\":{\"field\":\"jumlah_inbound\",\"type\":\"quantitative\",\"format\":\",.0f\"}}}]},{\"width\":\"container\",\"height\":80,\"layer\":[{\"mark\":{\"type\":\"text\",\"align\":\"center\",\"baseline\":\"middle\",\"dy\":-16,\"fontSize\":13,\"color\":\"#888888\"},\"encoding\":{\"text\":{\"value\":\"Tonase Inbound\"}}},{\"mark\":{\"type\":\"text\",\"align\":\"center\",\"baseline\":\"middle\",\"dy\":14,\"fontSize\":32,\"fontWeight\":\"bold\",\"color\":\"#E67E22\"},\"encoding\":{\"text\":{\"field\":\"tonase_inbound\",\"type\":\"quantitative\",\"format\":\",.2f\"}}}]}],\"config\":{\"view\":{\"stroke\":null}}}"
+              },
+              "widgetType": "custom-vega-viz",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "jumlah_inbound"
+                  },
+                  {
+                    "fieldName": "tonase_inbound"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "combo_outbound",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "uc04_stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "jumlah_outbound",
+                      "expression": "SUM(`jumlah_outbound`)"
+                    },
+                    {
+                      "name": "tonase_outbound",
+                      "expression": "SUM(`tonase_outbound`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "frame": {
+                "title": "Outbound",
+                "showTitle": true
+              },
+              "jsonSpec": {
+                "type": "vega-lite",
+                "spec": "{\"$schema\":\"https://vega.github.io/schema/vega-lite/v5.json\",\"data\":{\"name\":\"databricks_query\"},\"background\":\"transparent\",\"vconcat\":[{\"width\":\"container\",\"height\":80,\"layer\":[{\"mark\":{\"type\":\"text\",\"align\":\"center\",\"baseline\":\"middle\",\"dy\":-16,\"fontSize\":13,\"color\":\"#888888\"},\"encoding\":{\"text\":{\"value\":\"Jumlah Outbound\"}}},{\"mark\":{\"type\":\"text\",\"align\":\"center\",\"baseline\":\"middle\",\"dy\":14,\"fontSize\":32,\"fontWeight\":\"bold\",\"color\":\"#2E86AB\"},\"encoding\":{\"text\":{\"field\":\"jumlah_outbound\",\"type\":\"quantitative\",\"format\":\",.0f\"}}}]},{\"width\":\"container\",\"height\":80,\"layer\":[{\"mark\":{\"type\":\"text\",\"align\":\"center\",\"baseline\":\"middle\",\"dy\":-16,\"fontSize\":13,\"color\":\"#888888\"},\"encoding\":{\"text\":{\"value\":\"Tonase Outbound\"}}},{\"mark\":{\"type\":\"text\",\"align\":\"center\",\"baseline\":\"middle\",\"dy\":14,\"fontSize\":32,\"fontWeight\":\"bold\",\"color\":\"#E67E22\"},\"encoding\":{\"text\":{\"field\":\"tonase_outbound\",\"type\":\"quantitative\",\"format\":\",.2f\"}}}]}],\"config\":{\"view\":{\"stroke\":null}}}"
+              },
+              "widgetType": "custom-vega-viz",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "jumlah_outbound"
+                  },
+                  {
+                    "fieldName": "tonase_outbound"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "016bd5be",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "uc04_stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "shift",
+                      "expression": "`shift`"
+                    },
+                    {
+                      "name": "op_date",
+                      "expression": "`op_date`"
+                    },
+                    {
+                      "name": "sum(tonase_outbound)",
+                      "expression": "SUM(`tonase_outbound`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Tonase Outbound",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "op_date",
+                  "displayName": "tgl",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(tonase_outbound)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Tonase",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "shift",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "DS",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 1
+                        }
+                      },
+                      {
+                        "value": "NS",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 2
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 6,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "s1",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "uc04_stockpile_gold",
+                  "fields": [
+                    {
+                      "name": "op_date",
+                      "expression": "`op_date`"
+                    },
+                    {
+                      "name": "sum(stock)",
+                      "expression": "SUM(`stock`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "showTitle": true,
+                "showDescription": false,
+                "title": "Stock"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "op_date",
+                  "displayName": "tgl",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(stock)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Tonase",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 12,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "a37d8d16",
+      "displayName": "UC05 Operasional Crushing Plant",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_vehicle_in",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "sum(total_vehicle_in)",
+                      "expression": "SUM(`total_vehicle_in`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Vehicle In",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_vehicle_in)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_vehicle_out",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "sum(total_vehicle_out)",
+                      "expression": "SUM(`total_vehicle_out`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Vehicle Out",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_vehicle_out)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_total_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Tonnage",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_tonnage)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_avg_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "avg(avg_tonnage_per_vehicle)",
+                      "expression": "AVG(`avg_tonnage_per_vehicle`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Avg Tonnage/Vehicle",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_tonnage_per_vehicle)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_cp_duration",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "avg(avg_cp_area_duration_minutes)",
+                      "expression": "AVG(`avg_cp_area_duration_minutes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Avg CP Duration (min)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_cp_area_duration_minutes)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_anomaly",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "sum(anomaly_count)",
+                      "expression": "SUM(`anomaly_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Anomaly Count",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(anomaly_count)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_hourly_flow",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_hourly_summary",
+                  "fields": [
+                    {
+                      "name": "transaction_hour",
+                      "expression": "`transaction_hour`"
+                    },
+                    {
+                      "name": "sum(vehicle_in)",
+                      "expression": "SUM(`vehicle_in`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Hourly Vehicle Flow",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "transaction_hour",
+                  "displayName": "transaction_hour",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(vehicle_in)",
+                  "displayName": "vehicle_in",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "transaction_hour",
+                  "displayName": "transaction_hour",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_tonnage_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Tonnage by CP",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "displayName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_tonnage)",
+                  "displayName": "total_tonnage",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "queue_name",
+                  "displayName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "table_lane_perf",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_lane_summary",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "lane_sb",
+                      "expression": "`lane_sb`"
+                    },
+                    {
+                      "name": "total_transaction",
+                      "expression": "`total_transaction`"
+                    },
+                    {
+                      "name": "vehicle_in",
+                      "expression": "`vehicle_in`"
+                    },
+                    {
+                      "name": "vehicle_out",
+                      "expression": "`vehicle_out`"
+                    },
+                    {
+                      "name": "total_tonnage",
+                      "expression": "`total_tonnage`"
+                    },
+                    {
+                      "name": "avg_cp_area_duration_minutes",
+                      "expression": "`avg_cp_area_duration_minutes`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Lane Performance",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "queue_name"
+                  },
+                  {
+                    "fieldName": "lane_sb"
+                  },
+                  {
+                    "fieldName": "total_transaction"
+                  },
+                  {
+                    "fieldName": "vehicle_in"
+                  },
+                  {
+                    "fieldName": "vehicle_out"
+                  },
+                  {
+                    "fieldName": "total_tonnage"
+                  },
+                  {
+                    "fieldName": "avg_cp_area_duration_minutes"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "table_exceptions",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_exception_monitoring",
+                  "fields": [
+                    {
+                      "name": "transaction_date",
+                      "expression": "`transaction_date`"
+                    },
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "nomor_lambung",
+                      "expression": "`nomor_lambung`"
+                    },
+                    {
+                      "name": "truck_type",
+                      "expression": "`truck_type`"
+                    },
+                    {
+                      "name": "vehicle_movement_status",
+                      "expression": "`vehicle_movement_status`"
+                    },
+                    {
+                      "name": "data_quality_status",
+                      "expression": "`data_quality_status`"
+                    },
+                    {
+                      "name": "tonnage_value",
+                      "expression": "`tonnage_value`"
+                    },
+                    {
+                      "name": "cp_area_duration_minutes",
+                      "expression": "`cp_area_duration_minutes`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Exception Monitoring",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "transaction_date"
+                  },
+                  {
+                    "fieldName": "queue_name"
+                  },
+                  {
+                    "fieldName": "nomor_lambung"
+                  },
+                  {
+                    "fieldName": "truck_type"
+                  },
+                  {
+                    "fieldName": "vehicle_movement_status"
+                  },
+                  {
+                    "fieldName": "data_quality_status"
+                  },
+                  {
+                    "fieldName": "tonnage_value"
+                  },
+                  {
+                    "fieldName": "cp_area_duration_minutes"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 12,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "uc05_realtime",
+      "displayName": "UC05 Real-Time Monitoring",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_alert",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "count(alert_count)",
+                      "expression": "COUNT(`alert_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Alert Count",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(alert_count)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_cp_monitored",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "count(total_cp_monitored)",
+                      "expression": "COUNT(`total_cp_monitored`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "CP Monitored",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(total_cp_monitored)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_avg_tph",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "count(avg_tph)",
+                      "expression": "COUNT(`avg_tph`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Avg TPH",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(avg_tph)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "count(total_tonnage)",
+                      "expression": "COUNT(`total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Tonnage",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(total_tonnage)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_vehicle_in",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "count(total_vehicle_in)",
+                      "expression": "COUNT(`total_vehicle_in`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Vehicle In",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(total_vehicle_in)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_vehicle_out",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "count(total_vehicle_out)",
+                      "expression": "COUNT(`total_vehicle_out`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Vehicle Out",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(total_vehicle_out)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "table_cp_monitoring",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_realtime_monitoring",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "estimated_queue_length",
+                      "expression": "`estimated_queue_length`"
+                    },
+                    {
+                      "name": "estimated_active_units",
+                      "expression": "`estimated_active_units`"
+                    },
+                    {
+                      "name": "tph",
+                      "expression": "`tph`"
+                    },
+                    {
+                      "name": "utilization_percentage",
+                      "expression": "`utilization_percentage`"
+                    },
+                    {
+                      "name": "alert_status",
+                      "expression": "`alert_status`"
+                    },
+                    {
+                      "name": "avg_cp_area_duration_minutes",
+                      "expression": "`avg_cp_area_duration_minutes`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "CP Monitoring Status",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "queue_name"
+                  },
+                  {
+                    "fieldName": "estimated_queue_length"
+                  },
+                  {
+                    "fieldName": "estimated_active_units"
+                  },
+                  {
+                    "fieldName": "tph"
+                  },
+                  {
+                    "fieldName": "utilization_percentage"
+                  },
+                  {
+                    "fieldName": "alert_status"
+                  },
+                  {
+                    "fieldName": "avg_cp_area_duration_minutes"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_shift",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_shift_comparison",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Shift Comparison",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "displayName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_tonnage)",
+                  "displayName": "total_tonnage",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "queue_name",
+                  "displayName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "uc05_comparison",
+      "displayName": "UC05 Comparison",
+      "layout": [
+        {
+          "widget": {
+            "name": "filter_left_start",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8744a61f8b9eb4fc14d6297bbf_left_start_ts",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "parameters": [
+                    {
+                      "name": "left_start_ts",
+                      "keyword": "left_start_ts"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8744f51c12a786ecd6aa3ba217_left_start_ts",
+                "query": {
+                  "datasetName": "05_ds_comparison_delta_by_cp",
+                  "parameters": [
+                    {
+                      "name": "left_start_ts",
+                      "keyword": "left_start_ts"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Period A Start",
+                "showTitle": true
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "DATE",
+                    "values": [
+                      {
+                        "value": "2026-06-01T00:00:00.000"
+                      }
+                    ]
+                  }
+                }
+              },
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "left_start_ts",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8744a61f8b9eb4fc14d6297bbf_left_start_ts"
+                  },
+                  {
+                    "parameterName": "left_start_ts",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8744f51c12a786ecd6aa3ba217_left_start_ts"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_left_end",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8744a61f8b9eb4fc14d6297bbf_left_end_ts",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "parameters": [
+                    {
+                      "name": "left_end_ts",
+                      "keyword": "left_end_ts"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8744f51c12a786ecd6aa3ba217_left_end_ts",
+                "query": {
+                  "datasetName": "05_ds_comparison_delta_by_cp",
+                  "parameters": [
+                    {
+                      "name": "left_end_ts",
+                      "keyword": "left_end_ts"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Period A End",
+                "showTitle": true
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "DATE",
+                    "values": [
+                      {
+                        "value": "2026-06-10T00:00:00.000"
+                      }
+                    ]
+                  }
+                }
+              },
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "left_end_ts",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8744a61f8b9eb4fc14d6297bbf_left_end_ts"
+                  },
+                  {
+                    "parameterName": "left_end_ts",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8744f51c12a786ecd6aa3ba217_left_end_ts"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_right_start",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8745381f4fb6e72bcb14f73c2d_right_start_ts",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "parameters": [
+                    {
+                      "name": "right_start_ts",
+                      "keyword": "right_start_ts"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8744f51c12a786ecd6aa3ba217_right_start_ts",
+                "query": {
+                  "datasetName": "05_ds_comparison_delta_by_cp",
+                  "parameters": [
+                    {
+                      "name": "right_start_ts",
+                      "keyword": "right_start_ts"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Period B Start",
+                "showTitle": true
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "DATE",
+                    "values": [
+                      {
+                        "value": "2026-06-01T00:00:00.000"
+                      }
+                    ]
+                  }
+                }
+              },
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "right_start_ts",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8745381f4fb6e72bcb14f73c2d_right_start_ts"
+                  },
+                  {
+                    "parameterName": "right_start_ts",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8744f51c12a786ecd6aa3ba217_right_start_ts"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_right_end",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8745381f4fb6e72bcb14f73c2d_right_end_ts",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "parameters": [
+                    {
+                      "name": "right_end_ts",
+                      "keyword": "right_end_ts"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8744f51c12a786ecd6aa3ba217_right_end_ts",
+                "query": {
+                  "datasetName": "05_ds_comparison_delta_by_cp",
+                  "parameters": [
+                    {
+                      "name": "right_end_ts",
+                      "keyword": "right_end_ts"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Period B End",
+                "showTitle": true
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "DATE",
+                    "values": [
+                      {
+                        "value": "2026-07-10T00:00:00.000"
+                      }
+                    ]
+                  }
+                }
+              },
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "right_end_ts",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8745381f4fb6e72bcb14f73c2d_right_end_ts"
+                  },
+                  {
+                    "parameterName": "right_end_ts",
+                    "queryName": "parameter_dashboards/01f18e2b9cc7133b851b29bfe11f1a33/datasets/01f18e8744f51c12a786ecd6aa3ba217_right_end_ts"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_left_vehicle_in",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(vehicle_in)",
+                      "expression": "SUM(`vehicle_in`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Vehicle In (A)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(vehicle_in)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_left_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Tonnage (A)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_tonnage)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_left_tph",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(tph)",
+                      "expression": "SUM(`tph`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "TPH (A)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(tph)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_right_vehicle_in",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(vehicle_in)",
+                      "expression": "SUM(`vehicle_in`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Vehicle In (B)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(vehicle_in)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_right_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Tonnage (B)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_tonnage)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_right_tph",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(tph)",
+                      "expression": "SUM(`tph`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "TPH (B)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(tph)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_left_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Tonnage by CP (A)",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "displayName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_tonnage)",
+                  "displayName": "total_tonnage",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "queue_name",
+                  "displayName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_right_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Tonnage by CP (B)",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "displayName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_tonnage)",
+                  "displayName": "total_tonnage",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "queue_name",
+                  "displayName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 4,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_delta_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_comparison_delta_by_cp",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "sum(delta_total_tonnage)",
+                      "expression": "SUM(`delta_total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Delta Tonnage by CP",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "displayName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(delta_total_tonnage)",
+                  "displayName": "delta_total_tonnage",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "queue_name",
+                  "displayName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_delta_tph",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_comparison_delta_by_cp",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "sum(delta_tph)",
+                      "expression": "SUM(`delta_tph`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Delta TPH by CP",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "displayName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(delta_tph)",
+                  "displayName": "delta_tph",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "queue_name",
+                  "displayName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 9,
+            "width": 6,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "34b27c46",
+      "displayName": "Untitled page",
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}

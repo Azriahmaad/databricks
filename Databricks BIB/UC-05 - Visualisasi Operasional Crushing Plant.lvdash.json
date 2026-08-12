@@ -1,0 +1,4887 @@
+{
+  "datasets": [
+    {
+      "name": "05_cp_daily_summary",
+      "displayName": "05 CP Daily Summary",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_daily_summary`"
+      ]
+    },
+    {
+      "name": "05_cp_lane_summary",
+      "displayName": "05 CP Lane Summary",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_lane_summary`"
+      ]
+    },
+    {
+      "name": "05_cp_exception_monitoring",
+      "displayName": "05 CP Exception Monitoring",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_exception_monitoring`"
+      ]
+    },
+    {
+      "name": "05_cp_hourly_summary",
+      "displayName": "05 CP Hourly Summary",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`"
+      ]
+    },
+    {
+      "name": "05_cp_shift_comparison",
+      "displayName": "05 CP Shift-by-Shift Comparison",
+      "queryLines": [
+        "WITH shift_data AS (\n",
+        "  SELECT\n",
+        "    transaction_date,\n",
+        "    transaction_hour,\n",
+        "    queue_name,\n",
+        "    port,\n",
+        "    vehicle_in,\n",
+        "    vehicle_out,\n",
+        "    total_tonnage,\n",
+        "    avg_cp_area_duration_minutes,\n",
+        "    CASE\n",
+        "      WHEN\n",
+        "        transaction_hour >= 6\n",
+        "        AND transaction_hour < 18\n",
+        "      THEN\n",
+        "        'Day Shift'\n",
+        "      ELSE 'Night Shift'\n",
+        "    END AS shift_name,\n",
+        "    CASE\n",
+        "      WHEN transaction_hour < 6 THEN DATE_SUB(transaction_date, 1)\n",
+        "      ELSE transaction_date\n",
+        "    END AS shift_date\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        ")\n",
+        "SELECT\n",
+        "  shift_name,\n",
+        "  queue_name,\n",
+        "  SUM(vehicle_in) AS total_vehicle_in,\n",
+        "  SUM(vehicle_out) AS total_vehicle_out,\n",
+        "  SUM(total_tonnage) AS total_tonnage,\n",
+        "  AVG(total_tonnage) AS avg_tph,\n",
+        "  AVG(avg_cp_area_duration_minutes) AS avg_cp_area_duration_minutes\n",
+        "FROM\n",
+        "  shift_data\n",
+        "GROUP BY\n",
+        "  shift_name,\n",
+        "  queue_name"
+      ]
+    },
+    {
+      "name": "05_cp_hourly_trend",
+      "displayName": "05 CP Hourly Trend",
+      "queryLines": [
+        "SELECT\n",
+        "  transaction_date,\n",
+        "  transaction_hour,\n",
+        "  CONCAT(\n",
+        "    CAST(transaction_date AS STRING),\n",
+        "    ' ',\n",
+        "    LPAD(CAST(transaction_hour AS STRING), 2, '0'),\n",
+        "    ':00'\n",
+        "  ) AS hour_label,\n",
+        "  queue_name,\n",
+        "  vehicle_in,\n",
+        "  vehicle_out,\n",
+        "  total_tonnage,\n",
+        "  total_tonnage AS tph_approx\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        "ORDER BY\n",
+        "  transaction_date DESC,\n",
+        "  transaction_hour DESC"
+      ]
+    },
+    {
+      "name": "05_cp_realtime_monitoring",
+      "displayName": "05 CP Real-Time Monitoring",
+      "queryLines": [
+        "WITH latest_hourly AS (\n",
+        "  SELECT\n",
+        "    queue_name,\n",
+        "    transaction_date,\n",
+        "    transaction_hour,\n",
+        "    total_transaction,\n",
+        "    vehicle_in,\n",
+        "    vehicle_out,\n",
+        "    total_tonnage,\n",
+        "    avg_cp_area_duration_minutes,\n",
+        "    avg_queue_duration_minutes,\n",
+        "    ROW_NUMBER() OVER (\n",
+        "        PARTITION BY queue_name\n",
+        "        ORDER BY transaction_date DESC, transaction_hour DESC\n",
+        "      ) as rn\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        "),\n",
+        "cp_metrics AS (\n",
+        "  SELECT\n",
+        "    queue_name,\n",
+        "    vehicle_in - vehicle_out AS estimated_queue_length,\n",
+        "    vehicle_in - vehicle_out AS estimated_active_units,\n",
+        "    total_tonnage AS tph,\n",
+        "    100.0 AS installed_capacity_tph,\n",
+        "    (total_tonnage / 100.0) * 100 AS utilization_percentage,\n",
+        "    CASE\n",
+        "      WHEN (vehicle_in - vehicle_out) > 8 THEN 'ALERT'\n",
+        "      ELSE 'NORMAL'\n",
+        "    END AS alert_status,\n",
+        "    vehicle_in AS total_vehicle_in,\n",
+        "    vehicle_out AS total_vehicle_out,\n",
+        "    total_tonnage,\n",
+        "    avg_cp_area_duration_minutes,\n",
+        "    avg_queue_duration_minutes\n",
+        "  FROM\n",
+        "    latest_hourly\n",
+        "  WHERE\n",
+        "    rn = 1\n",
+        ")\n",
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  cp_metrics"
+      ]
+    },
+    {
+      "name": "05_cp_day_comparison",
+      "displayName": "05 CP Day-over-Day Comparison",
+      "queryLines": [
+        "SELECT\n",
+        "  transaction_date,\n",
+        "  queue_name,\n",
+        "  SUM(total_vehicle_in) AS total_vehicle_in,\n",
+        "  SUM(total_vehicle_out) AS total_vehicle_out,\n",
+        "  SUM(total_tonnage) AS total_tonnage,\n",
+        "  SUM(total_tonnage) / 24.0 AS avg_tph,\n",
+        "  AVG(avg_cp_area_duration_minutes) AS avg_cp_area_duration_minutes\n",
+        "FROM\n",
+        "  `uc`.`synova`.`gold_uc05_cp_vehicle_daily_summary`\n",
+        "GROUP BY\n",
+        "  transaction_date,\n",
+        "  queue_name\n",
+        "ORDER BY\n",
+        "  transaction_date DESC"
+      ]
+    },
+    {
+      "name": "05_cp_kpi_summary",
+      "displayName": "05 CP KPI Summary",
+      "queryLines": [
+        "WITH latest_data AS (\n",
+        "  SELECT\n",
+        "    COUNT(DISTINCT queue_name) AS total_cp_monitored,\n",
+        "    SUM(total_vehicle_in) AS total_vehicle_in,\n",
+        "    SUM(total_vehicle_out) AS total_vehicle_out,\n",
+        "    SUM(total_transaction) AS total_transaction,\n",
+        "    SUM(total_tonnage) AS total_tonnage,\n",
+        "    AVG(avg_cp_area_duration_minutes) AS avg_cp_area_duration,\n",
+        "    SUM(anomaly_count) AS anomaly_count,\n",
+        "    SUM(data_quality_issue_count) AS data_quality_issue_count\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_daily_summary`\n",
+        "),\n",
+        "queue_metrics AS (\n",
+        "  SELECT\n",
+        "    SUM(vehicle_in - vehicle_out) AS total_queue_length,\n",
+        "    SUM(vehicle_in - vehicle_out) AS total_active_units,\n",
+        "    SUM(\n",
+        "      CASE\n",
+        "        WHEN (vehicle_in - vehicle_out) > 8 THEN 1\n",
+        "        ELSE 0\n",
+        "      END\n",
+        "    ) AS alert_count,\n",
+        "    AVG(total_tonnage) AS avg_tph\n",
+        "  FROM\n",
+        "    (\n",
+        "      SELECT\n",
+        "        queue_name,\n",
+        "        vehicle_in,\n",
+        "        vehicle_out,\n",
+        "        total_tonnage,\n",
+        "        ROW_NUMBER() OVER (\n",
+        "            PARTITION BY queue_name\n",
+        "            ORDER BY transaction_date DESC, transaction_hour DESC\n",
+        "          ) as rn\n",
+        "      FROM\n",
+        "        `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        "    )\n",
+        "  WHERE\n",
+        "    rn = 1\n",
+        ")\n",
+        "SELECT\n",
+        "  ld.total_cp_monitored,\n",
+        "  COALESCE(qm.total_queue_length, 0) AS total_queue_length,\n",
+        "  COALESCE(qm.total_active_units, 0) AS total_active_units,\n",
+        "  COALESCE(qm.avg_tph, 0) AS avg_tph,\n",
+        "  ld.total_tonnage,\n",
+        "  ld.total_vehicle_in,\n",
+        "  ld.total_vehicle_out,\n",
+        "  ld.avg_cp_area_duration,\n",
+        "  COALESCE(qm.alert_count, 0) AS alert_count,\n",
+        "  ld.data_quality_issue_count\n",
+        "FROM\n",
+        "  latest_data ld CROSS JOIN queue_metrics qm"
+      ]
+    },
+    {
+      "name": "05_ds_left_cp_performance",
+      "displayName": "05 LEFT Period - CP Performance",
+      "queryLines": [
+        "WITH base AS (\n",
+        "  SELECT\n",
+        "    transaction_date,\n",
+        "    transaction_hour,\n",
+        "    queue_name,\n",
+        "    port,\n",
+        "    total_transaction,\n",
+        "    total_vehicle,\n",
+        "    vehicle_in,\n",
+        "    vehicle_out,\n",
+        "    total_tonnage,\n",
+        "    avg_queue_duration_minutes,\n",
+        "    avg_cp_area_duration_minutes,\n",
+        "    avg_cp_process_duration_minutes,\n",
+        "    to_timestamp(\n",
+        "      concat(\n",
+        "        cast(transaction_date AS string),\n",
+        "        ' ',\n",
+        "        lpad(cast(transaction_hour AS string), 2, '0'),\n",
+        "        ':00:00'\n",
+        "      )\n",
+        "    ) AS period_ts\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        ")\n",
+        "SELECT\n",
+        "  queue_name,\n",
+        "  SUM(vehicle_in) AS vehicle_in,\n",
+        "  SUM(vehicle_out) AS vehicle_out,\n",
+        "  SUM(total_transaction) AS total_transaction,\n",
+        "  SUM(total_vehicle) AS total_vehicle,\n",
+        "  SUM(total_tonnage) AS total_tonnage,\n",
+        "  SUM(total_tonnage)\n",
+        "    / GREATEST((unix_timestamp(:left_end_ts) - unix_timestamp(:left_start_ts)) / 3600.0, 1) AS tph,\n",
+        "  AVG(avg_queue_duration_minutes) AS avg_queue_duration_minutes,\n",
+        "  AVG(avg_cp_area_duration_minutes) AS avg_cp_area_duration_minutes,\n",
+        "  AVG(avg_cp_process_duration_minutes) AS avg_cp_process_duration_minutes\n",
+        "FROM\n",
+        "  base\n",
+        "WHERE\n",
+        "  :left_start_ts IS NOT NULL\n",
+        "  AND :left_end_ts IS NOT NULL\n",
+        "  AND period_ts >= :left_start_ts\n",
+        "  AND period_ts < :left_end_ts\n",
+        "GROUP BY\n",
+        "  queue_name\n",
+        "ORDER BY\n",
+        "  total_tonnage DESC"
+      ],
+      "parameters": [
+        {
+          "displayName": "Left Start DateTime",
+          "keyword": "left_start_ts",
+          "dataType": "DATETIME",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATETIME",
+              "values": [
+                {
+                  "value": "now-7d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Left End DateTime",
+          "keyword": "left_end_ts",
+          "dataType": "DATETIME",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATETIME",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05_ds_comparison_delta_by_cp",
+      "displayName": "05 Delta Comparison by CP",
+      "queryLines": [
+        "WITH base AS (\n",
+        "  SELECT\n",
+        "    transaction_date,\n",
+        "    transaction_hour,\n",
+        "    queue_name,\n",
+        "    port,\n",
+        "    total_transaction,\n",
+        "    total_vehicle,\n",
+        "    vehicle_in,\n",
+        "    vehicle_out,\n",
+        "    total_tonnage,\n",
+        "    avg_queue_duration_minutes,\n",
+        "    avg_cp_area_duration_minutes,\n",
+        "    avg_cp_process_duration_minutes,\n",
+        "    to_timestamp(\n",
+        "      concat(\n",
+        "        cast(transaction_date AS string),\n",
+        "        ' ',\n",
+        "        lpad(cast(transaction_hour AS string), 2, '0'),\n",
+        "        ':00:00'\n",
+        "      )\n",
+        "    ) AS period_ts\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        "),\n",
+        "left_period AS (\n",
+        "  SELECT\n",
+        "    queue_name,\n",
+        "    SUM(vehicle_in) AS left_vehicle_in,\n",
+        "    SUM(vehicle_out) AS left_vehicle_out,\n",
+        "    SUM(total_transaction) AS left_total_transaction,\n",
+        "    SUM(total_vehicle) AS left_total_vehicle,\n",
+        "    SUM(total_tonnage) AS left_total_tonnage,\n",
+        "    SUM(total_tonnage)\n",
+        "      / GREATEST(\n",
+        "        (unix_timestamp(:left_end_ts) - unix_timestamp(:left_start_ts)) / 3600.0,\n",
+        "        1\n",
+        "      ) AS left_tph,\n",
+        "    AVG(avg_queue_duration_minutes) AS left_avg_queue_duration,\n",
+        "    AVG(avg_cp_area_duration_minutes) AS left_avg_cp_area_duration,\n",
+        "    AVG(avg_cp_process_duration_minutes) AS left_avg_cp_process_duration\n",
+        "  FROM\n",
+        "    base\n",
+        "  WHERE\n",
+        "    :left_start_ts IS NOT NULL\n",
+        "    AND :left_end_ts IS NOT NULL\n",
+        "    AND period_ts >= :left_start_ts\n",
+        "    AND period_ts < :left_end_ts\n",
+        "  GROUP BY\n",
+        "    queue_name\n",
+        "),\n",
+        "right_period AS (\n",
+        "  SELECT\n",
+        "    queue_name,\n",
+        "    SUM(vehicle_in) AS right_vehicle_in,\n",
+        "    SUM(vehicle_out) AS right_vehicle_out,\n",
+        "    SUM(total_transaction) AS right_total_transaction,\n",
+        "    SUM(total_vehicle) AS right_total_vehicle,\n",
+        "    SUM(total_tonnage) AS right_total_tonnage,\n",
+        "    SUM(total_tonnage)\n",
+        "      / GREATEST(\n",
+        "        (unix_timestamp(:right_end_ts) - unix_timestamp(:right_start_ts)) / 3600.0,\n",
+        "        1\n",
+        "      ) AS right_tph,\n",
+        "    AVG(avg_queue_duration_minutes) AS right_avg_queue_duration,\n",
+        "    AVG(avg_cp_area_duration_minutes) AS right_avg_cp_area_duration,\n",
+        "    AVG(avg_cp_process_duration_minutes) AS right_avg_cp_process_duration\n",
+        "  FROM\n",
+        "    base\n",
+        "  WHERE\n",
+        "    :right_start_ts IS NOT NULL\n",
+        "    AND :right_end_ts IS NOT NULL\n",
+        "    AND period_ts >= :right_start_ts\n",
+        "    AND period_ts < :right_end_ts\n",
+        "  GROUP BY\n",
+        "    queue_name\n",
+        ")\n",
+        "SELECT\n",
+        "  COALESCE(l.queue_name, r.queue_name) AS queue_name,\n",
+        "  l.left_vehicle_in,\n",
+        "  r.right_vehicle_in,\n",
+        "  r.right_vehicle_in - l.left_vehicle_in AS delta_vehicle_in,\n",
+        "  CASE\n",
+        "    WHEN\n",
+        "      l.left_vehicle_in = 0\n",
+        "      OR l.left_vehicle_in IS NULL\n",
+        "    THEN\n",
+        "      NULL\n",
+        "    ELSE ((r.right_vehicle_in - l.left_vehicle_in) / l.left_vehicle_in) * 100\n",
+        "  END AS delta_vehicle_in_pct,\n",
+        "  l.left_vehicle_out,\n",
+        "  r.right_vehicle_out,\n",
+        "  r.right_vehicle_out - l.left_vehicle_out AS delta_vehicle_out,\n",
+        "  CASE\n",
+        "    WHEN\n",
+        "      l.left_vehicle_out = 0\n",
+        "      OR l.left_vehicle_out IS NULL\n",
+        "    THEN\n",
+        "      NULL\n",
+        "    ELSE ((r.right_vehicle_out - l.left_vehicle_out) / l.left_vehicle_out) * 100\n",
+        "  END AS delta_vehicle_out_pct,\n",
+        "  l.left_total_tonnage,\n",
+        "  r.right_total_tonnage,\n",
+        "  r.right_total_tonnage - l.left_total_tonnage AS delta_total_tonnage,\n",
+        "  CASE\n",
+        "    WHEN\n",
+        "      l.left_total_tonnage = 0\n",
+        "      OR l.left_total_tonnage IS NULL\n",
+        "    THEN\n",
+        "      NULL\n",
+        "    ELSE ((r.right_total_tonnage - l.left_total_tonnage) / l.left_total_tonnage) * 100\n",
+        "  END AS delta_total_tonnage_pct,\n",
+        "  l.left_tph,\n",
+        "  r.right_tph,\n",
+        "  r.right_tph - l.left_tph AS delta_tph,\n",
+        "  CASE\n",
+        "    WHEN\n",
+        "      l.left_tph = 0\n",
+        "      OR l.left_tph IS NULL\n",
+        "    THEN\n",
+        "      NULL\n",
+        "    ELSE ((r.right_tph - l.left_tph) / l.left_tph) * 100\n",
+        "  END AS delta_tph_pct,\n",
+        "  l.left_avg_cp_area_duration,\n",
+        "  r.right_avg_cp_area_duration,\n",
+        "  r.right_avg_cp_area_duration - l.left_avg_cp_area_duration AS delta_avg_cp_area_duration\n",
+        "FROM\n",
+        "  left_period l\n",
+        "    FULL OUTER JOIN right_period r\n",
+        "      ON l.queue_name = r.queue_name\n",
+        "ORDER BY\n",
+        "  ABS(delta_total_tonnage) DESC"
+      ],
+      "parameters": [
+        {
+          "displayName": "Left Start DateTime",
+          "keyword": "left_start_ts",
+          "dataType": "DATETIME",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATETIME",
+              "values": [
+                {
+                  "value": "now-7d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Left End DateTime",
+          "keyword": "left_end_ts",
+          "dataType": "DATETIME",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATETIME",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Right Start DateTime",
+          "keyword": "right_start_ts",
+          "dataType": "DATETIME",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATETIME",
+              "values": [
+                {
+                  "value": "now-14d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Right End DateTime",
+          "keyword": "right_end_ts",
+          "dataType": "DATETIME",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATETIME",
+              "values": [
+                {
+                  "value": "now-7d/d"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05_ds_right_cp_performance",
+      "displayName": "05 RIGHT Period - CP Performance",
+      "queryLines": [
+        "WITH base AS (\n",
+        "  SELECT\n",
+        "    transaction_date,\n",
+        "    transaction_hour,\n",
+        "    queue_name,\n",
+        "    port,\n",
+        "    total_transaction,\n",
+        "    total_vehicle,\n",
+        "    vehicle_in,\n",
+        "    vehicle_out,\n",
+        "    total_tonnage,\n",
+        "    avg_queue_duration_minutes,\n",
+        "    avg_cp_area_duration_minutes,\n",
+        "    avg_cp_process_duration_minutes,\n",
+        "    to_timestamp(\n",
+        "      concat(\n",
+        "        cast(transaction_date AS string),\n",
+        "        ' ',\n",
+        "        lpad(cast(transaction_hour AS string), 2, '0'),\n",
+        "        ':00:00'\n",
+        "      )\n",
+        "    ) AS period_ts\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        ")\n",
+        "SELECT\n",
+        "  queue_name,\n",
+        "  SUM(vehicle_in) AS vehicle_in,\n",
+        "  SUM(vehicle_out) AS vehicle_out,\n",
+        "  SUM(total_transaction) AS total_transaction,\n",
+        "  SUM(total_vehicle) AS total_vehicle,\n",
+        "  SUM(total_tonnage) AS total_tonnage,\n",
+        "  SUM(total_tonnage)\n",
+        "    / GREATEST(\n",
+        "      (unix_timestamp(:right_end_ts) - unix_timestamp(:right_start_ts)) / 3600.0,\n",
+        "      1\n",
+        "    ) AS tph,\n",
+        "  AVG(avg_queue_duration_minutes) AS avg_queue_duration_minutes,\n",
+        "  AVG(avg_cp_area_duration_minutes) AS avg_cp_area_duration_minutes,\n",
+        "  AVG(avg_cp_process_duration_minutes) AS avg_cp_process_duration_minutes\n",
+        "FROM\n",
+        "  base\n",
+        "WHERE\n",
+        "  :right_start_ts IS NOT NULL\n",
+        "  AND :right_end_ts IS NOT NULL\n",
+        "  AND period_ts >= :right_start_ts\n",
+        "  AND period_ts < :right_end_ts\n",
+        "GROUP BY\n",
+        "  queue_name\n",
+        "ORDER BY\n",
+        "  total_tonnage DESC"
+      ],
+      "parameters": [
+        {
+          "displayName": "Right Start DateTime",
+          "keyword": "right_start_ts",
+          "dataType": "DATETIME",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATETIME",
+              "values": [
+                {
+                  "value": "now-14d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Right End DateTime",
+          "keyword": "right_end_ts",
+          "dataType": "DATETIME",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATETIME",
+              "values": [
+                {
+                  "value": "now-7d/d"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05_ds_left_hourly_trend",
+      "displayName": "05 LEFT Period - Hourly Trend",
+      "queryLines": [
+        "WITH base AS (\n",
+        "  SELECT\n",
+        "    transaction_date,\n",
+        "    transaction_hour,\n",
+        "    queue_name,\n",
+        "    vehicle_in,\n",
+        "    vehicle_out,\n",
+        "    total_tonnage,\n",
+        "    to_timestamp(\n",
+        "      concat(\n",
+        "        cast(transaction_date AS string),\n",
+        "        ' ',\n",
+        "        lpad(cast(transaction_hour AS string), 2, '0'),\n",
+        "        ':00:00'\n",
+        "      )\n",
+        "    ) AS period_ts\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        ")\n",
+        "SELECT\n",
+        "  transaction_hour,\n",
+        "  SUM(vehicle_in) AS vehicle_in,\n",
+        "  SUM(vehicle_out) AS vehicle_out,\n",
+        "  SUM(total_tonnage) AS total_tonnage\n",
+        "FROM\n",
+        "  base\n",
+        "WHERE\n",
+        "  :left_start_ts IS NOT NULL\n",
+        "  AND :left_end_ts IS NOT NULL\n",
+        "  AND period_ts >= :left_start_ts\n",
+        "  AND period_ts < :left_end_ts\n",
+        "GROUP BY\n",
+        "  transaction_hour\n",
+        "ORDER BY\n",
+        "  transaction_hour"
+      ],
+      "parameters": [
+        {
+          "displayName": "Left Start DateTime",
+          "keyword": "left_start_ts",
+          "dataType": "DATETIME",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATETIME",
+              "values": [
+                {
+                  "value": "now-7d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Left End DateTime",
+          "keyword": "left_end_ts",
+          "dataType": "DATETIME",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATETIME",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05_ds_right_hourly_trend",
+      "displayName": "05 RIGHT Period - Hourly Trend",
+      "queryLines": [
+        "WITH base AS (\n",
+        "  SELECT\n",
+        "    transaction_date,\n",
+        "    transaction_hour,\n",
+        "    queue_name,\n",
+        "    vehicle_in,\n",
+        "    vehicle_out,\n",
+        "    total_tonnage,\n",
+        "    to_timestamp(\n",
+        "      concat(\n",
+        "        cast(transaction_date AS string),\n",
+        "        ' ',\n",
+        "        lpad(cast(transaction_hour AS string), 2, '0'),\n",
+        "        ':00:00'\n",
+        "      )\n",
+        "    ) AS period_ts\n",
+        "  FROM\n",
+        "    `uc`.`synova`.`gold_uc05_cp_vehicle_hourly_summary`\n",
+        ")\n",
+        "SELECT\n",
+        "  transaction_hour,\n",
+        "  SUM(vehicle_in) AS vehicle_in,\n",
+        "  SUM(vehicle_out) AS vehicle_out,\n",
+        "  SUM(total_tonnage) AS total_tonnage\n",
+        "FROM\n",
+        "  base\n",
+        "WHERE\n",
+        "  :right_start_ts IS NOT NULL\n",
+        "  AND :right_end_ts IS NOT NULL\n",
+        "  AND period_ts >= :right_start_ts\n",
+        "  AND period_ts < :right_end_ts\n",
+        "GROUP BY\n",
+        "  transaction_hour\n",
+        "ORDER BY\n",
+        "  transaction_hour"
+      ],
+      "parameters": [
+        {
+          "displayName": "Right Start DateTime",
+          "keyword": "right_start_ts",
+          "dataType": "DATETIME",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATETIME",
+              "values": [
+                {
+                  "value": "now-14d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Right End DateTime",
+          "keyword": "right_end_ts",
+          "dataType": "DATETIME",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATETIME",
+              "values": [
+                {
+                  "value": "now-7d/d"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "57db950b",
+      "displayName": "UC05 Operasional Crushing Plant",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_vehicle_in",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "sum(total_vehicle_in)",
+                      "expression": "SUM(`total_vehicle_in`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Vehicle In",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_vehicle_in)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_vehicle_out",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "sum(total_vehicle_out)",
+                      "expression": "SUM(`total_vehicle_out`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Vehicle Out",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_vehicle_out)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_total_transaction",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "sum(total_transaction)",
+                      "expression": "SUM(`total_transaction`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Transaction",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_transaction)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_completed_transaction",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "sum(completed_transaction)",
+                      "expression": "SUM(`completed_transaction`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Completed Transaction",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(completed_transaction)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_total_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Tonnage",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_tonnage)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_avg_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "avg(avg_tonnage_per_vehicle)",
+                      "expression": "AVG(`avg_tonnage_per_vehicle`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Avg Tonnage per Vehicle",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_tonnage_per_vehicle)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_cp_area_duration",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "avg(avg_cp_area_duration_minutes)",
+                      "expression": "AVG(`avg_cp_area_duration_minutes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Avg CP Area Duration (min)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_cp_area_duration_minutes)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_queue_duration",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "avg(avg_queue_duration_minutes)",
+                      "expression": "AVG(`avg_queue_duration_minutes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Avg Queue Duration (min)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_queue_duration_minutes)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 3,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_anomaly",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "sum(anomaly_count)",
+                      "expression": "SUM(`anomaly_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Anomaly Count",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(anomaly_count)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 3,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_data_quality",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "sum(data_quality_issue_count)",
+                      "expression": "SUM(`data_quality_issue_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Data Quality Issue",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(data_quality_issue_count)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 3,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_hourly_flow",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_hourly_summary",
+                  "fields": [
+                    {
+                      "name": "transaction_hour",
+                      "expression": "`transaction_hour`"
+                    },
+                    {
+                      "name": "sum(vehicle_in)",
+                      "expression": "SUM(`vehicle_in`)"
+                    },
+                    {
+                      "name": "sum(vehicle_out)",
+                      "expression": "SUM(`vehicle_out`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Trend Kendaraan Masuk-Keluar per Jam",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "layer"
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "transaction_hour",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fields": [
+                    {
+                      "fieldName": "sum(vehicle_in)"
+                    },
+                    {
+                      "fieldName": "sum(vehicle_out)"
+                    }
+                  ],
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_vehicle_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "sum(total_vehicle_in)",
+                      "expression": "SUM(`total_vehicle_in`)"
+                    },
+                    {
+                      "name": "sum(total_vehicle_out)",
+                      "expression": "SUM(`total_vehicle_out`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Kendaraan Masuk-Keluar per CP",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fields": [
+                    {
+                      "fieldName": "sum(total_vehicle_in)"
+                    },
+                    {
+                      "fieldName": "sum(total_vehicle_out)"
+                    }
+                  ],
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_tonnage_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Total Tonnage per CP",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_tonnage)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 11,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_duration_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "avg(avg_queue_duration_minutes)",
+                      "expression": "AVG(`avg_queue_duration_minutes`)"
+                    },
+                    {
+                      "name": "avg(avg_cp_area_duration_minutes)",
+                      "expression": "AVG(`avg_cp_area_duration_minutes`)"
+                    },
+                    {
+                      "name": "avg(avg_cp_process_duration_minutes)",
+                      "expression": "AVG(`avg_cp_process_duration_minutes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Average Duration per CP",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fields": [
+                    {
+                      "fieldName": "avg(avg_queue_duration_minutes)"
+                    },
+                    {
+                      "fieldName": "avg(avg_cp_area_duration_minutes)"
+                    },
+                    {
+                      "fieldName": "avg(avg_cp_process_duration_minutes)"
+                    }
+                  ],
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "table_lane_performance",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_lane_summary",
+                  "fields": [
+                    {
+                      "name": "transaction_date",
+                      "expression": "`transaction_date`"
+                    },
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "lane_sb",
+                      "expression": "`lane_sb`"
+                    },
+                    {
+                      "name": "sum(total_transaction)",
+                      "expression": "SUM(`total_transaction`)"
+                    },
+                    {
+                      "name": "sum(vehicle_in)",
+                      "expression": "SUM(`vehicle_in`)"
+                    },
+                    {
+                      "name": "sum(vehicle_out)",
+                      "expression": "SUM(`vehicle_out`)"
+                    },
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    },
+                    {
+                      "name": "avg(avg_cp_process_duration_minutes)",
+                      "expression": "AVG(`avg_cp_process_duration_minutes`)"
+                    },
+                    {
+                      "name": "avg(avg_cp_area_duration_minutes)",
+                      "expression": "AVG(`avg_cp_area_duration_minutes`)"
+                    },
+                    {
+                      "name": "sum(anomaly_count)",
+                      "expression": "SUM(`anomaly_count`)"
+                    },
+                    {
+                      "name": "sum(data_quality_issue_count)",
+                      "expression": "SUM(`data_quality_issue_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Lane Performance",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "transaction_date"
+                  },
+                  {
+                    "fieldName": "queue_name"
+                  },
+                  {
+                    "fieldName": "lane_sb"
+                  },
+                  {
+                    "fieldName": "sum(total_transaction)",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "compact"
+                    }
+                  },
+                  {
+                    "fieldName": "sum(vehicle_in)",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "compact"
+                    }
+                  },
+                  {
+                    "fieldName": "sum(vehicle_out)",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "compact"
+                    }
+                  },
+                  {
+                    "fieldName": "sum(total_tonnage)",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "compact",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "avg(avg_cp_process_duration_minutes)",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 2
+                      }
+                    },
+                    "displayName": "Avg CP Process Duration"
+                  },
+                  {
+                    "fieldName": "avg(avg_cp_area_duration_minutes)",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 2
+                      }
+                    },
+                    "displayName": "Avg CP Area Duration"
+                  },
+                  {
+                    "fieldName": "sum(anomaly_count)"
+                  },
+                  {
+                    "fieldName": "sum(data_quality_issue_count)"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 23,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_lane_transaction",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_lane_summary",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "lane_sb",
+                      "expression": "`lane_sb`"
+                    },
+                    {
+                      "name": "sum(total_transaction)",
+                      "expression": "SUM(`total_transaction`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Total Transaction per Lane",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "lane_sb",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_transaction)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 29,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "table_exception_monitoring",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_exception_monitoring",
+                  "fields": [
+                    {
+                      "name": "created_at_ts",
+                      "expression": "`created_at_ts`"
+                    },
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "nomor_lambung",
+                      "expression": "`nomor_lambung`"
+                    },
+                    {
+                      "name": "truck_type",
+                      "expression": "`truck_type`"
+                    },
+                    {
+                      "name": "lane_sb",
+                      "expression": "`lane_sb`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "completed_by",
+                      "expression": "`completed_by`"
+                    },
+                    {
+                      "name": "assigned_by",
+                      "expression": "`assigned_by`"
+                    },
+                    {
+                      "name": "vehicle_movement_status",
+                      "expression": "`vehicle_movement_status`"
+                    },
+                    {
+                      "name": "data_quality_status",
+                      "expression": "`data_quality_status`"
+                    },
+                    {
+                      "name": "tonnage_value",
+                      "expression": "`tonnage_value`"
+                    },
+                    {
+                      "name": "queue_duration_minutes",
+                      "expression": "`queue_duration_minutes`"
+                    },
+                    {
+                      "name": "cp_area_duration_minutes",
+                      "expression": "`cp_area_duration_minutes`"
+                    },
+                    {
+                      "name": "cp_process_duration_minutes",
+                      "expression": "`cp_process_duration_minutes`"
+                    },
+                    {
+                      "name": "audit_latency_minutes",
+                      "expression": "`audit_latency_minutes`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Exception Monitoring",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "created_at_ts"
+                  },
+                  {
+                    "fieldName": "queue_name"
+                  },
+                  {
+                    "fieldName": "nomor_lambung"
+                  },
+                  {
+                    "fieldName": "truck_type"
+                  },
+                  {
+                    "fieldName": "lane_sb"
+                  },
+                  {
+                    "fieldName": "status"
+                  },
+                  {
+                    "fieldName": "completed_by"
+                  },
+                  {
+                    "fieldName": "assigned_by"
+                  },
+                  {
+                    "fieldName": "vehicle_movement_status"
+                  },
+                  {
+                    "fieldName": "data_quality_status"
+                  },
+                  {
+                    "fieldName": "tonnage_value",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "queue_duration_minutes",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 2
+                      }
+                    },
+                    "displayName": "Queue Duration"
+                  },
+                  {
+                    "fieldName": "cp_area_duration_minutes",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 2
+                      }
+                    },
+                    "displayName": "CP Area Duration"
+                  },
+                  {
+                    "fieldName": "cp_process_duration_minutes",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 2
+                      }
+                    },
+                    "displayName": "CP Process Duration"
+                  },
+                  {
+                    "fieldName": "audit_latency_minutes",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 2
+                      }
+                    },
+                    "displayName": "Audit Latency"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 35,
+            "width": 12,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "global_filters",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "filter_date",
+            "queries": [
+              {
+                "name": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8450ed120194e0fc07cc4fe0f7_transaction_date",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "transaction_date",
+                      "expression": "`transaction_date`"
+                    },
+                    {
+                      "name": "transaction_date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Date Range",
+                "showTitle": true
+              },
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "transaction_date",
+                    "queryName": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8450ed120194e0fc07cc4fe0f7_transaction_date"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_cp",
+            "queries": [
+              {
+                "name": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8450ed120194e0fc07cc4fe0f7_queue_name",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "queue_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "CP",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "queue_name",
+                    "queryName": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8450ed120194e0fc07cc4fe0f7_queue_name"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_port",
+            "queries": [
+              {
+                "name": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8450ed120194e0fc07cc4fe0f7_port",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "port",
+                      "expression": "`port`"
+                    },
+                    {
+                      "name": "port_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Port",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "port",
+                    "queryName": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8450ed120194e0fc07cc4fe0f7_port"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_truck_type",
+            "queries": [
+              {
+                "name": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8450ed120194e0fc07cc4fe0f7_truck_type",
+                "query": {
+                  "datasetName": "05_cp_daily_summary",
+                  "fields": [
+                    {
+                      "name": "truck_type",
+                      "expression": "`truck_type`"
+                    },
+                    {
+                      "name": "truck_type_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Truck Type",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "truck_type",
+                    "queryName": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8450ed120194e0fc07cc4fe0f7_truck_type"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_shift",
+            "queries": [
+              {
+                "name": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e846a07187db1403ae7ff83d599_shift_name",
+                "query": {
+                  "datasetName": "05_cp_shift_comparison",
+                  "fields": [
+                    {
+                      "name": "shift_name",
+                      "expression": "`shift_name`"
+                    },
+                    {
+                      "name": "shift_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Shift",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "shift_name",
+                    "queryName": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e846a07187db1403ae7ff83d599_shift_name"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_hour",
+            "queries": [
+              {
+                "name": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e84543e19d29411ce6f24a181a1_transaction_hour",
+                "query": {
+                  "datasetName": "05_cp_hourly_summary",
+                  "fields": [
+                    {
+                      "name": "transaction_hour",
+                      "expression": "`transaction_hour`"
+                    },
+                    {
+                      "name": "transaction_hour_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Hour",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "transaction_hour",
+                    "queryName": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e84543e19d29411ce6f24a181a1_transaction_hour"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_lane",
+            "queries": [
+              {
+                "name": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8451c91bfa9d25caca8b16b019_lane_sb",
+                "query": {
+                  "datasetName": "05_cp_lane_summary",
+                  "fields": [
+                    {
+                      "name": "lane_sb",
+                      "expression": "`lane_sb`"
+                    },
+                    {
+                      "name": "lane_sb_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Lane",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "lane_sb",
+                    "queryName": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8451c91bfa9d25caca8b16b019_lane_sb"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_movement_status",
+            "queries": [
+              {
+                "name": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8452d51f6196786c9d122dfac8_vehicle_movement_status",
+                "query": {
+                  "datasetName": "05_cp_exception_monitoring",
+                  "fields": [
+                    {
+                      "name": "vehicle_movement_status",
+                      "expression": "`vehicle_movement_status`"
+                    },
+                    {
+                      "name": "vehicle_movement_status_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Movement Status",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "vehicle_movement_status",
+                    "queryName": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8452d51f6196786c9d122dfac8_vehicle_movement_status"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_data_quality",
+            "queries": [
+              {
+                "name": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8452d51f6196786c9d122dfac8_data_quality_status",
+                "query": {
+                  "datasetName": "05_cp_exception_monitoring",
+                  "fields": [
+                    {
+                      "name": "data_quality_status",
+                      "expression": "`data_quality_status`"
+                    },
+                    {
+                      "name": "data_quality_status_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Data Quality Status",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "data_quality_status",
+                    "queryName": "dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8452d51f6196786c9d122dfac8_data_quality_status"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 4,
+            "width": 3,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "e626cf54",
+      "displayName": "UC05 Real-Time Monitoring",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_alert_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "alert_count",
+                      "expression": "`alert_count`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Alert Count",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "alert_count"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 5,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "header_text",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## UC-5 - Visualisasi Operasional Crushing Plant\n",
+                "\n",
+                "Monitoring real-time antrian, unit aktif, TPH, utilisasi CP, dan bottleneck antar Crushing Plant."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_data_quality",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "data_quality_issue_count",
+                      "expression": "`data_quality_issue_count`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Data Quality Issue Count",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "data_quality_issue_count"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 5,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_cp_monitored",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "total_cp_monitored",
+                      "expression": "`total_cp_monitored`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total CP Monitored",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "total_cp_monitored"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_queue_length",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "total_queue_length",
+                      "expression": "`total_queue_length`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Queue Length (Estimated)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "total_queue_length"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_active_units",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "total_active_units",
+                      "expression": "`total_active_units`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Active Units (Estimated)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "total_active_units"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_avg_tph",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "avg_tph",
+                      "expression": "`avg_tph`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Average TPH",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg_tph",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_total_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "total_tonnage",
+                      "expression": "`total_tonnage`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Tonnage",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "total_tonnage",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_vehicle_in",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "total_vehicle_in",
+                      "expression": "`total_vehicle_in`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Vehicle In",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "total_vehicle_in"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_vehicle_out",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "total_vehicle_out",
+                      "expression": "`total_vehicle_out`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Vehicle Out",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "total_vehicle_out"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 11,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_queue_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_realtime_monitoring",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "estimated_queue_length",
+                      "expression": "`estimated_queue_length`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Panjang Antrian per CP",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "estimated_queue_length",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 4,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_utilization_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_realtime_monitoring",
+                  "fields": [
+                    {
+                      "name": "utilization_percentage",
+                      "expression": "`utilization_percentage`"
+                    },
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Utilisasi CP terhadap Kapasitas Terpasang",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "utilization_percentage",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 19,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "table_cp_monitoring",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_realtime_monitoring",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "estimated_queue_length",
+                      "expression": "`estimated_queue_length`"
+                    },
+                    {
+                      "name": "estimated_active_units",
+                      "expression": "`estimated_active_units`"
+                    },
+                    {
+                      "name": "tph",
+                      "expression": "`tph`"
+                    },
+                    {
+                      "name": "installed_capacity_tph",
+                      "expression": "`installed_capacity_tph`"
+                    },
+                    {
+                      "name": "utilization_percentage",
+                      "expression": "`utilization_percentage`"
+                    },
+                    {
+                      "name": "alert_status",
+                      "expression": "`alert_status`"
+                    },
+                    {
+                      "name": "total_vehicle_in",
+                      "expression": "`total_vehicle_in`"
+                    },
+                    {
+                      "name": "total_vehicle_out",
+                      "expression": "`total_vehicle_out`"
+                    },
+                    {
+                      "name": "avg_cp_area_duration_minutes",
+                      "expression": "`avg_cp_area_duration_minutes`"
+                    },
+                    {
+                      "name": "avg_queue_duration_minutes",
+                      "expression": "`avg_queue_duration_minutes`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Real-Time CP Monitoring",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "queue_name"
+                  },
+                  {
+                    "fieldName": "estimated_queue_length",
+                    "displayName": "Queue Length"
+                  },
+                  {
+                    "fieldName": "estimated_active_units",
+                    "displayName": "Active Units"
+                  },
+                  {
+                    "fieldName": "tph",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "compact",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "installed_capacity_tph",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 0
+                      }
+                    },
+                    "displayName": "Capacity TPH"
+                  },
+                  {
+                    "fieldName": "utilization_percentage",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Utilization %"
+                  },
+                  {
+                    "fieldName": "alert_status"
+                  },
+                  {
+                    "fieldName": "total_vehicle_in",
+                    "displayName": "Vehicle In"
+                  },
+                  {
+                    "fieldName": "total_vehicle_out",
+                    "displayName": "Vehicle Out"
+                  },
+                  {
+                    "fieldName": "avg_cp_area_duration_minutes",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Avg CP Area Duration"
+                  },
+                  {
+                    "fieldName": "avg_queue_duration_minutes",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Avg Queue Duration"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_shift_comparison",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_shift_comparison",
+                  "fields": [
+                    {
+                      "name": "shift_name",
+                      "expression": "`shift_name`"
+                    },
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    },
+                    {
+                      "name": "sum(total_vehicle_in)",
+                      "expression": "SUM(`total_vehicle_in`)"
+                    },
+                    {
+                      "name": "sum(total_vehicle_out)",
+                      "expression": "SUM(`total_vehicle_out`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Komparasi Shift-by-Shift",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "shift_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fields": [
+                    {
+                      "fieldName": "sum(total_tonnage)"
+                    },
+                    {
+                      "fieldName": "sum(total_vehicle_in)"
+                    },
+                    {
+                      "fieldName": "sum(total_vehicle_out)"
+                    }
+                  ],
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 19,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_cp_area_duration",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_kpi_summary",
+                  "fields": [
+                    {
+                      "name": "avg_cp_area_duration",
+                      "expression": "`avg_cp_area_duration`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Avg CP Area Duration",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg_cp_area_duration",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_active_units_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_realtime_monitoring",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "estimated_active_units",
+                      "expression": "`estimated_active_units`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Unit Aktif di Area CP",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "estimated_active_units",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 14,
+            "width": 4,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_tph_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_realtime_monitoring",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "tph",
+                      "expression": "`tph`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "TPH Realtime per CP",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "tph",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 14,
+            "width": 4,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "table_bottleneck",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_cp_realtime_monitoring",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "estimated_queue_length",
+                      "expression": "`estimated_queue_length`"
+                    },
+                    {
+                      "name": "estimated_active_units",
+                      "expression": "`estimated_active_units`"
+                    },
+                    {
+                      "name": "tph",
+                      "expression": "`tph`"
+                    },
+                    {
+                      "name": "utilization_percentage",
+                      "expression": "`utilization_percentage`"
+                    },
+                    {
+                      "name": "avg_queue_duration_minutes",
+                      "expression": "`avg_queue_duration_minutes`"
+                    },
+                    {
+                      "name": "avg_cp_area_duration_minutes",
+                      "expression": "`avg_cp_area_duration_minutes`"
+                    },
+                    {
+                      "name": "alert_status",
+                      "expression": "`alert_status`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Indikasi Bottleneck CP",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "queue_name"
+                  },
+                  {
+                    "fieldName": "estimated_queue_length",
+                    "displayName": "Queue Length"
+                  },
+                  {
+                    "fieldName": "estimated_active_units",
+                    "displayName": "Active Units"
+                  },
+                  {
+                    "fieldName": "tph",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "compact",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "utilization_percentage",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Utilization %"
+                  },
+                  {
+                    "fieldName": "avg_queue_duration_minutes",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Avg Queue Duration"
+                  },
+                  {
+                    "fieldName": "avg_cp_area_duration_minutes",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Avg CP Area Duration"
+                  },
+                  {
+                    "fieldName": "alert_status"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 34,
+            "width": 12,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "dab7ce23",
+      "displayName": "UC05 Comparison",
+      "layout": [
+        {
+          "widget": {
+            "name": "header_comparison",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## UC-5 - Perbandingan Periode Crushing Plant\n",
+                "\n",
+                "Dashboard perbandingan kinerja operasional CP antara dua periode yang dipilih secara independen."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_left_start_ts",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e84940b17f6b0608ba17c414686_left_start_ts",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "parameters": [
+                    {
+                      "name": "left_start_ts",
+                      "keyword": "left_start_ts"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Period A Start",
+                "showTitle": true
+              },
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "left_start_ts",
+                    "queryName": "parameter_dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e84940b17f6b0608ba17c414686_left_start_ts"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_left_end_ts",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e84940b17f6b0608ba17c414686_left_end_ts",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "parameters": [
+                    {
+                      "name": "left_end_ts",
+                      "keyword": "left_end_ts"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Period A End",
+                "showTitle": true
+              },
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "left_end_ts",
+                    "queryName": "parameter_dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e84940b17f6b0608ba17c414686_left_end_ts"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_right_start_ts",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8496ba11c08c2261a20a6ac5bc_right_start_ts",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "parameters": [
+                    {
+                      "name": "right_start_ts",
+                      "keyword": "right_start_ts"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Period B Start",
+                "showTitle": true
+              },
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "right_start_ts",
+                    "queryName": "parameter_dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8496ba11c08c2261a20a6ac5bc_right_start_ts"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "header_left_section",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### 📊 Periode A"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "header_right_section",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### 📊 Periode B"
+              ]
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 4,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_left_vehicle_in",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(vehicle_in)",
+                      "expression": "SUM(`vehicle_in`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Vehicle In (A)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(vehicle_in)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_left_vehicle_out",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(vehicle_out)",
+                      "expression": "SUM(`vehicle_out`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Vehicle Out (A)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(vehicle_out)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 10,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_left_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Tonnage (A)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_tonnage)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 10,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_right_vehicle_in",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(vehicle_in)",
+                      "expression": "SUM(`vehicle_in`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Vehicle In (B)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(vehicle_in)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 10,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_right_vehicle_out",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(vehicle_out)",
+                      "expression": "SUM(`vehicle_out`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Vehicle Out (B)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(vehicle_out)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 10,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_right_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Tonnage (B)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_tonnage)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 10,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_left_tph",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(tph)",
+                      "expression": "SUM(`tph`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "TPH (A)",
+                "showTitle": true
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(tph)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 13,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_left_cp_duration",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "fields": [
+                    {
+                      "name": "avg(avg_cp_area_duration_minutes)",
+                      "expression": "AVG(`avg_cp_area_duration_minutes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "CP Duration (A)",
+                "showTitle": true
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_cp_area_duration_minutes)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 13,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_right_tph",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "fields": [
+                    {
+                      "name": "sum(tph)",
+                      "expression": "SUM(`tph`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "TPH (B)",
+                "showTitle": true
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(tph)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 13,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_right_cp_duration",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "fields": [
+                    {
+                      "name": "avg(avg_cp_area_duration_minutes)",
+                      "expression": "AVG(`avg_cp_area_duration_minutes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "CP Duration (B)",
+                "showTitle": true
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_cp_area_duration_minutes)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 13,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_left_vehicle_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "vehicle_in",
+                      "expression": "`vehicle_in`"
+                    },
+                    {
+                      "name": "vehicle_out",
+                      "expression": "`vehicle_out`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Vehicle by CP (A)",
+                "showTitle": true
+              },
+              "version": 3,
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fields": [
+                    {
+                      "fieldName": "vehicle_in"
+                    },
+                    {
+                      "fieldName": "vehicle_out"
+                    }
+                  ],
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 16,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_right_vehicle_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "vehicle_in",
+                      "expression": "`vehicle_in`"
+                    },
+                    {
+                      "name": "vehicle_out",
+                      "expression": "`vehicle_out`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Vehicle by CP (B)",
+                "showTitle": true
+              },
+              "version": 3,
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fields": [
+                    {
+                      "fieldName": "vehicle_in"
+                    },
+                    {
+                      "fieldName": "vehicle_out"
+                    }
+                  ],
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 16,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_left_tonnage_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "total_tonnage",
+                      "expression": "`total_tonnage`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Tonnage by CP (A)",
+                "showTitle": true
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "total_tonnage",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 21,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_right_tonnage_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "total_tonnage",
+                      "expression": "`total_tonnage`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Tonnage by CP (B)",
+                "showTitle": true
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "total_tonnage",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 21,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "table_left_cp_performance",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_left_cp_performance",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "vehicle_in",
+                      "expression": "`vehicle_in`"
+                    },
+                    {
+                      "name": "vehicle_out",
+                      "expression": "`vehicle_out`"
+                    },
+                    {
+                      "name": "total_tonnage",
+                      "expression": "`total_tonnage`"
+                    },
+                    {
+                      "name": "tph",
+                      "expression": "`tph`"
+                    },
+                    {
+                      "name": "avg_cp_area_duration_minutes",
+                      "expression": "`avg_cp_area_duration_minutes`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "CP Performance (A)",
+                "showTitle": true
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "queue_name"
+                  },
+                  {
+                    "fieldName": "vehicle_in",
+                    "displayName": "Vehicle In"
+                  },
+                  {
+                    "fieldName": "vehicle_out",
+                    "displayName": "Vehicle Out"
+                  },
+                  {
+                    "fieldName": "total_tonnage",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "compact",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Tonnage"
+                  },
+                  {
+                    "fieldName": "tph",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "TPH"
+                  },
+                  {
+                    "fieldName": "avg_cp_area_duration_minutes",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Avg Duration (min)"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 26,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "table_right_cp_performance",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "vehicle_in",
+                      "expression": "`vehicle_in`"
+                    },
+                    {
+                      "name": "vehicle_out",
+                      "expression": "`vehicle_out`"
+                    },
+                    {
+                      "name": "total_tonnage",
+                      "expression": "`total_tonnage`"
+                    },
+                    {
+                      "name": "tph",
+                      "expression": "`tph`"
+                    },
+                    {
+                      "name": "avg_cp_area_duration_minutes",
+                      "expression": "`avg_cp_area_duration_minutes`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "CP Performance (B)",
+                "showTitle": true
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "queue_name"
+                  },
+                  {
+                    "fieldName": "vehicle_in",
+                    "displayName": "Vehicle In"
+                  },
+                  {
+                    "fieldName": "vehicle_out",
+                    "displayName": "Vehicle Out"
+                  },
+                  {
+                    "fieldName": "total_tonnage",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "compact",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Tonnage"
+                  },
+                  {
+                    "fieldName": "tph",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "TPH"
+                  },
+                  {
+                    "fieldName": "avg_cp_area_duration_minutes",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Avg Duration (min)"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 26,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "header_delta_section",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### 🔺 Selisih Periode B vs Periode A\n",
+                "\n",
+                "Perbandingan metrik kinerja antara dua periode yang dipilih."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 32,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_delta_tonnage_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_comparison_delta_by_cp",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "delta_total_tonnage",
+                      "expression": "`delta_total_tonnage`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Delta Tonnage by CP",
+                "showTitle": true
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "delta_total_tonnage",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 34,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_delta_tph_by_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_comparison_delta_by_cp",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "delta_tph",
+                      "expression": "`delta_tph`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Delta TPH by CP",
+                "showTitle": true
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "queue_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "delta_tph",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 34,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "table_delta_comparison",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "05_ds_comparison_delta_by_cp",
+                  "fields": [
+                    {
+                      "name": "queue_name",
+                      "expression": "`queue_name`"
+                    },
+                    {
+                      "name": "left_vehicle_in",
+                      "expression": "`left_vehicle_in`"
+                    },
+                    {
+                      "name": "right_vehicle_in",
+                      "expression": "`right_vehicle_in`"
+                    },
+                    {
+                      "name": "delta_vehicle_in",
+                      "expression": "`delta_vehicle_in`"
+                    },
+                    {
+                      "name": "delta_vehicle_in_pct",
+                      "expression": "`delta_vehicle_in_pct`"
+                    },
+                    {
+                      "name": "left_total_tonnage",
+                      "expression": "`left_total_tonnage`"
+                    },
+                    {
+                      "name": "right_total_tonnage",
+                      "expression": "`right_total_tonnage`"
+                    },
+                    {
+                      "name": "delta_total_tonnage",
+                      "expression": "`delta_total_tonnage`"
+                    },
+                    {
+                      "name": "delta_total_tonnage_pct",
+                      "expression": "`delta_total_tonnage_pct`"
+                    },
+                    {
+                      "name": "left_tph",
+                      "expression": "`left_tph`"
+                    },
+                    {
+                      "name": "right_tph",
+                      "expression": "`right_tph`"
+                    },
+                    {
+                      "name": "delta_tph",
+                      "expression": "`delta_tph`"
+                    },
+                    {
+                      "name": "delta_tph_pct",
+                      "expression": "`delta_tph_pct`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "title": "Delta Comparison",
+                "showTitle": true
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "queue_name",
+                    "displayName": "CP"
+                  },
+                  {
+                    "fieldName": "left_vehicle_in",
+                    "displayName": "Vehicle In (A)"
+                  },
+                  {
+                    "fieldName": "right_vehicle_in",
+                    "displayName": "Vehicle In (B)"
+                  },
+                  {
+                    "fieldName": "delta_vehicle_in",
+                    "displayName": "Δ Vehicle In"
+                  },
+                  {
+                    "fieldName": "delta_vehicle_in_pct",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Δ %"
+                  },
+                  {
+                    "fieldName": "left_total_tonnage",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "compact",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Tonnage (A)"
+                  },
+                  {
+                    "fieldName": "right_total_tonnage",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "compact",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Tonnage (B)"
+                  },
+                  {
+                    "fieldName": "delta_total_tonnage",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "compact",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Δ Tonnage"
+                  },
+                  {
+                    "fieldName": "delta_total_tonnage_pct",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Δ %"
+                  },
+                  {
+                    "fieldName": "left_tph",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "TPH (A)"
+                  },
+                  {
+                    "fieldName": "right_tph",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "TPH (B)"
+                  },
+                  {
+                    "fieldName": "delta_tph",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Δ TPH"
+                  },
+                  {
+                    "fieldName": "delta_tph_pct",
+                    "format": {
+                      "type": "number-plain",
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    },
+                    "displayName": "Δ %"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 39,
+            "width": 12,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_right_end_ts",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8496ba11c08c2261a20a6ac5bc_right_end_ts",
+                "query": {
+                  "datasetName": "05_ds_right_cp_performance",
+                  "parameters": [
+                    {
+                      "name": "right_end_ts",
+                      "keyword": "right_end_ts"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Period B End",
+                "showTitle": true
+              },
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "right_end_ts",
+                    "queryName": "parameter_dashboards/01f18e7dc62d120fbd8d0ad45ccff2ab/datasets/01f18e8496ba11c08c2261a20a6ac5bc_right_end_ts"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}

@@ -1,0 +1,742 @@
+{
+  "datasets": [
+    {
+      "name": "silver_tonnage_flow",
+      "displayName": "Silver Tonnage Flow",
+      "queryLines": [
+        "SELECT\n",
+        "  adjusted_date,\n",
+        "  flow_mode,\n",
+        "  shift,\n",
+        "  SUM(tonnage_delta) AS total_tonnage,\n",
+        "  SUM(delta_volume) AS total_volume,\n",
+        "  COUNT(*) AS reading_count\n",
+        "FROM\n",
+        "  uc.uscavis.silver_tonnage_cleaned\n",
+        "WHERE\n",
+        "  tonnage_delta IS NOT NULL\n",
+        "  AND flow_mode IN ('direct', 'non_direct')\n",
+        "GROUP BY\n",
+        "  adjusted_date,\n",
+        "  flow_mode,\n",
+        "  shift\n",
+        "ORDER BY\n",
+        "  adjusted_date,\n",
+        "  flow_mode"
+      ]
+    },
+    {
+      "name": "gold_output_summary",
+      "displayName": "Gold Output Summary",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  uc.uscavis.gold_output_summary"
+      ]
+    },
+    {
+      "name": "gold_wim_cv_ratio",
+      "displayName": "Gold WIM CV Ratio",
+      "queryLines": [
+        "SELECT\n",
+        "  *\n",
+        "FROM\n",
+        "  uc.uscavis.gold_wim_cv_ratio"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "8cced271",
+      "displayName": "Overview",
+      "layout": [
+        {
+          "widget": {
+            "name": "date_filter",
+            "queries": [
+              {
+                "name": "dashboards/01f1920e9ff619738c378fc418b4bbf1/datasets/01f1920eeeae1c189a1d8697aaae2fab_date",
+                "query": {
+                  "datasetName": "gold_output_summary",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Date Filter",
+                "showTitle": true
+              },
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "date",
+                    "queryName": "dashboards/01f1920e9ff619738c378fc418b4bbf1/datasets/01f1920eeeae1c189a1d8697aaae2fab_date"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "shift_filter",
+            "queries": [
+              {
+                "name": "dashboards/01f1920e9ff619738c378fc418b4bbf1/datasets/01f1920eeeae1c189a1d8697aaae2fab_shift",
+                "query": {
+                  "datasetName": "gold_output_summary",
+                  "fields": [
+                    {
+                      "name": "shift",
+                      "expression": "`shift`"
+                    },
+                    {
+                      "name": "shift_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Shift Filter",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "shift",
+                    "queryName": "dashboards/01f1920e9ff619738c378fc418b4bbf1/datasets/01f1920eeeae1c189a1d8697aaae2fab_shift"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "cp_filter",
+            "queries": [
+              {
+                "name": "dashboards/01f1920e9ff619738c378fc418b4bbf1/datasets/01f1920eeeae1c189a1d8697aaae2fab_cp_name",
+                "query": {
+                  "datasetName": "gold_output_summary",
+                  "fields": [
+                    {
+                      "name": "cp_name",
+                      "expression": "`cp_name`"
+                    },
+                    {
+                      "name": "cp_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "CP Filter",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "cp_name",
+                    "queryName": "dashboards/01f1920e9ff619738c378fc418b4bbf1/datasets/01f1920eeeae1c189a1d8697aaae2fab_cp_name"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 5,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "total_tonnage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gold_output_summary",
+                  "fields": [
+                    {
+                      "name": "sum(total_tonnage_ton)",
+                      "expression": "SUM(`total_tonnage_ton`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Tonnage (Ton)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_tonnage_ton)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "avg_throughput",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gold_output_summary",
+                  "fields": [
+                    {
+                      "name": "avg(avg_throughput_tph)",
+                      "expression": "AVG(`avg_throughput_tph`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Avg Throughput (TPH)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_throughput_tph)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "avg_running_pct",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gold_output_summary",
+                  "fields": [
+                    {
+                      "name": "avg(running_pct)",
+                      "expression": "AVG(`running_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Avg Running %",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(running_pct)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "avg_productivity",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gold_output_summary",
+                  "fields": [
+                    {
+                      "name": "avg(productivity_tph)",
+                      "expression": "AVG(`productivity_tph`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Avg Productivity (TPH)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(productivity_tph)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "tonnage_per_cp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gold_output_summary",
+                  "fields": [
+                    {
+                      "name": "shift",
+                      "expression": "`shift`"
+                    },
+                    {
+                      "name": "cp_name",
+                      "expression": "`cp_name`"
+                    },
+                    {
+                      "name": "sum(total_tonnage_ton)",
+                      "expression": "SUM(`total_tonnage_ton`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Tonase Output per CP per Shift",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "cp_name",
+                  "displayName": "CP Name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_tonnage_ton)",
+                  "displayName": "Total Tonnage (Ton)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "shift",
+                  "displayName": "Shift",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 8,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "pie_flow_mode",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "silver_tonnage_flow",
+                  "fields": [
+                    {
+                      "name": "sum(total_tonnage)",
+                      "expression": "SUM(`total_tonnage`)"
+                    },
+                    {
+                      "name": "flow_mode",
+                      "expression": "`flow_mode`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Proporsi Direct vs Non-Direct",
+                "showTitle": true
+              },
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "sum(total_tonnage)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "total_tonnage"
+                },
+                "color": {
+                  "fieldName": "flow_mode",
+                  "displayName": "flow_mode",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 5,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "wim_cv_ratio_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gold_wim_cv_ratio",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "avg(wim_cv_ratio)",
+                      "expression": "AVG(`wim_cv_ratio`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Trend WIM/CV Ratio (Konsistensi Reading)",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "date",
+                  "displayName": "Date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(wim_cv_ratio)",
+                  "displayName": "WIM/CV Ratio",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "wim_cv_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gold_wim_cv_ratio",
+                  "fields": [
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "wim_tonnage",
+                      "expression": "`wim_tonnage`"
+                    },
+                    {
+                      "name": "conveyor_tonnage",
+                      "expression": "`conveyor_tonnage`"
+                    },
+                    {
+                      "name": "wim_cv_ratio",
+                      "expression": "`wim_cv_ratio`"
+                    },
+                    {
+                      "name": "deviation_pct",
+                      "expression": "`deviation_pct`"
+                    },
+                    {
+                      "name": "anomaly_flag",
+                      "expression": "`anomaly_flag`"
+                    },
+                    {
+                      "name": "anomaly_type",
+                      "expression": "`anomaly_type`"
+                    },
+                    {
+                      "name": "truck_count",
+                      "expression": "`truck_count`"
+                    },
+                    {
+                      "name": "density_actual",
+                      "expression": "`density_actual`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "WIM vs Conveyor - Detail Harian",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "date"
+                  },
+                  {
+                    "fieldName": "wim_tonnage"
+                  },
+                  {
+                    "fieldName": "conveyor_tonnage"
+                  },
+                  {
+                    "fieldName": "wim_cv_ratio"
+                  },
+                  {
+                    "fieldName": "deviation_pct"
+                  },
+                  {
+                    "fieldName": "anomaly_flag"
+                  },
+                  {
+                    "fieldName": "anomaly_type"
+                  },
+                  {
+                    "fieldName": "truck_count"
+                  },
+                  {
+                    "fieldName": "density_actual"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "tonnage_daily_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gold_output_summary",
+                  "fields": [
+                    {
+                      "name": "cp_name",
+                      "expression": "`cp_name`"
+                    },
+                    {
+                      "name": "date",
+                      "expression": "`date`"
+                    },
+                    {
+                      "name": "sum(total_tonnage_ton)",
+                      "expression": "SUM(`total_tonnage_ton`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Tonnage per CP per Hari",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "date",
+                  "displayName": "Date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_tonnage_ton)",
+                  "displayName": "Total Tonnage (Ton)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "cp_name",
+                  "displayName": "CP Name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 22,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "description",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## UC-06: Output Crushing Plant\n",
+                "Monitoring output per CP (Direct vs Non-Direct), konsistensi WIM/CV ratio, dan trend density vs referensi BIB (0.88)."
+              ]
+            }
+          },
+          "position": {
+            "x": 7,
+            "y": 0,
+            "width": 5,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
